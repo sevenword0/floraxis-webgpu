@@ -12,6 +12,7 @@ export interface PetalGeometryOptions {
   cup: number;
   curl: number;
   seed: number;
+  thickness?: number;
   colors: Pick<FlowerColors, 'base' | 'tip'>;
 }
 
@@ -80,7 +81,7 @@ const buildPositions = (
   return positions;
 };
 
-const buildIndices = (widthSegments: number, lengthSegments: number): number[] => {
+const buildSurfaceIndices = (widthSegments: number, lengthSegments: number): number[] => {
   const indices: number[] = [];
   for (let iy = 0; iy < lengthSegments; iy += 1) {
     for (let ix = 0; ix < widthSegments; ix += 1) {
@@ -88,8 +89,66 @@ const buildIndices = (widthSegments: number, lengthSegments: number): number[] =
       const b = a + widthSegments + 1;
       const c = b + 1;
       const d = a + 1;
-      indices.push(a, b, d, b, c, d);
+      indices.push(a, d, b, b, d, c);
     }
+  }
+  return indices;
+};
+
+const buildShellPositions = (
+  surface: Float32Array,
+  surfaceNormals: Float32Array,
+  thickness: number,
+): Float32Array => {
+  const shell = new Float32Array(surface.length * 2);
+  const halfThickness = thickness * 0.5;
+  for (let index = 0; index < surface.length; index += 3) {
+    const backIndex = surface.length + index;
+    const nx = surfaceNormals[index];
+    const ny = surfaceNormals[index + 1];
+    const nz = surfaceNormals[index + 2];
+    shell[index] = surface[index] + nx * halfThickness;
+    shell[index + 1] = surface[index + 1] + ny * halfThickness;
+    shell[index + 2] = surface[index + 2] + nz * halfThickness;
+    shell[backIndex] = surface[index] - nx * halfThickness;
+    shell[backIndex + 1] = surface[index + 1] - ny * halfThickness;
+    shell[backIndex + 2] = surface[index + 2] - nz * halfThickness;
+  }
+  return shell;
+};
+
+const buildPerimeter = (widthSegments: number, lengthSegments: number): number[] => {
+  const rowWidth = widthSegments + 1;
+  const perimeter: number[] = [];
+  for (let ix = 0; ix <= widthSegments; ix += 1) perimeter.push(ix);
+  for (let iy = 1; iy <= lengthSegments; iy += 1) perimeter.push(iy * rowWidth + widthSegments);
+  for (let ix = widthSegments - 1; ix >= 0; ix -= 1) perimeter.push(lengthSegments * rowWidth + ix);
+  for (let iy = lengthSegments - 1; iy > 0; iy -= 1) perimeter.push(iy * rowWidth);
+  return perimeter;
+};
+
+const buildShellIndices = (
+  surfaceIndices: number[],
+  widthSegments: number,
+  lengthSegments: number,
+): number[] => {
+  const surfaceCount = (widthSegments + 1) * (lengthSegments + 1);
+  const indices = [...surfaceIndices];
+
+  for (let index = 0; index < surfaceIndices.length; index += 3) {
+    const a = surfaceIndices[index] + surfaceCount;
+    const b = surfaceIndices[index + 1] + surfaceCount;
+    const c = surfaceIndices[index + 2] + surfaceCount;
+    indices.push(a, c, b);
+  }
+
+  const perimeter = buildPerimeter(widthSegments, lengthSegments);
+  for (let index = 0; index < perimeter.length; index += 1) {
+    const frontA = perimeter[index];
+    const frontB = perimeter[(index + 1) % perimeter.length];
+    const backA = frontA + surfaceCount;
+    const backB = frontB + surfaceCount;
+    indices.push(frontA, backA, frontB, frontB, backA, backB);
   }
   return indices;
 };
@@ -104,15 +163,24 @@ const computeNormals = (positions: Float32Array, indices: number[]): Float32Arra
   return normals;
 };
 
+export const resolvePetalThickness = (length: number): number => THREE.MathUtils.clamp(length * 0.014, 0.009, 0.026);
+
 export const createPetalGeometry = (options: PetalGeometryOptions): THREE.BufferGeometry => {
   const widthSegments = 10;
   const lengthSegments = 18;
-  const closed = buildPositions(options, false, widthSegments, lengthSegments);
-  const opened = buildPositions(options, true, widthSegments, lengthSegments);
-  const indices = buildIndices(widthSegments, lengthSegments);
+  const closedSurface = buildPositions(options, false, widthSegments, lengthSegments);
+  const openedSurface = buildPositions(options, true, widthSegments, lengthSegments);
+  const surfaceIndices = buildSurfaceIndices(widthSegments, lengthSegments);
+  const closedSurfaceNormals = computeNormals(closedSurface, surfaceIndices);
+  const openedSurfaceNormals = computeNormals(openedSurface, surfaceIndices);
+  const thickness = options.thickness ?? resolvePetalThickness(options.length);
+  const closed = buildShellPositions(closedSurface, closedSurfaceNormals, thickness);
+  const opened = buildShellPositions(openedSurface, openedSurfaceNormals, thickness);
+  const indices = buildShellIndices(surfaceIndices, widthSegments, lengthSegments);
   const closedNormals = computeNormals(closed, indices);
   const openNormals = computeNormals(opened, indices);
-  const count = (widthSegments + 1) * (lengthSegments + 1);
+  const surfaceCount = (widthSegments + 1) * (lengthSegments + 1);
+  const count = surfaceCount * 2;
   const colors = new Float32Array(count * 3);
   const uvs = new Float32Array(count * 2);
   const baseColor = new THREE.Color(options.colors.base);
@@ -120,15 +188,18 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
 
   let colorPtr = 0;
   let uvPtr = 0;
-  for (let iy = 0; iy <= lengthSegments; iy += 1) {
-    const v = iy / lengthSegments;
-    const tint = baseColor.clone().lerp(tipColor, Math.pow(v, 0.72));
-    for (let ix = 0; ix <= widthSegments; ix += 1) {
-      colors[colorPtr++] = tint.r;
-      colors[colorPtr++] = tint.g;
-      colors[colorPtr++] = tint.b;
-      uvs[uvPtr++] = ix / widthSegments;
-      uvs[uvPtr++] = v;
+  for (let side = 0; side < 2; side += 1) {
+    for (let iy = 0; iy <= lengthSegments; iy += 1) {
+      const v = iy / lengthSegments;
+      const tint = baseColor.clone().lerp(tipColor, Math.pow(v, 0.72));
+      if (side === 1) tint.multiplyScalar(0.82);
+      for (let ix = 0; ix <= widthSegments; ix += 1) {
+        colors[colorPtr++] = tint.r;
+        colors[colorPtr++] = tint.g;
+        colors[colorPtr++] = tint.b;
+        uvs[uvPtr++] = ix / widthSegments;
+        uvs[uvPtr++] = v;
+      }
     }
   }
 
@@ -141,8 +212,61 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.morphAttributes.position = [new THREE.BufferAttribute(opened, 3)];
   geometry.morphAttributes.normal = [new THREE.BufferAttribute(openNormals, 3)];
   geometry.morphTargetsRelative = false;
+  geometry.userData.petalThickness = thickness;
+  geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
+};
+
+const samplePetalHeight = (u: number, v: number): number => {
+  const x = THREE.MathUtils.clamp(u, 0, 1) * 2 - 1;
+  const y = THREE.MathUtils.clamp(v, 0, 1);
+  const lengthMask = Math.pow(Math.max(0, Math.sin(Math.PI * y)), 0.62);
+  const midrib = Math.exp(-x * x * 34) * (0.035 + lengthMask * 0.11);
+  const veinPhase = (Math.abs(x) * 8.5 - y * 14) * Math.PI;
+  const veins = Math.sin(veinPhase) * (1 - Math.exp(-Math.abs(x) * 6)) * lengthMask * 0.0065;
+  const microCells = Math.sin((x + y * 0.31) * 43) * Math.sin(y * 67) * lengthMask * 0.0012;
+  return midrib + veins + microCells;
+};
+
+export const createPetalNormalMap = (width = 96, height = 192): THREE.DataTexture => {
+  const data = new Uint8Array(width * height * 4);
+  const du = 1 / Math.max(1, width - 1);
+  const dv = 1 / Math.max(1, height - 1);
+  const normal = new THREE.Vector3();
+
+  for (let y = 0; y < height; y += 1) {
+    const v = y / Math.max(1, height - 1);
+    for (let x = 0; x < width; x += 1) {
+      const u = x / Math.max(1, width - 1);
+      const dx = (samplePetalHeight(u + du, v) - samplePetalHeight(u - du, v)) / (du * 2);
+      const dy = (samplePetalHeight(u, v + dv) - samplePetalHeight(u, v - dv)) / (dv * 2);
+      normal.set(-dx * 0.34, -dy * 0.21, 1).normalize();
+      const pointer = (y * width + x) * 4;
+      data[pointer] = Math.round((normal.x * 0.5 + 0.5) * 255);
+      data[pointer + 1] = Math.round((normal.y * 0.5 + 0.5) * 255);
+      data[pointer + 2] = Math.round((normal.z * 0.5 + 0.5) * 255);
+      data[pointer + 3] = 255;
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
+  texture.name = 'Floraxis petal veins normal map';
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+};
+
+let sharedPetalNormalMap: THREE.DataTexture | undefined;
+
+const getPetalNormalMap = (): THREE.DataTexture => {
+  sharedPetalNormalMap ??= createPetalNormalMap();
+  return sharedPetalNormalMap;
 };
 
 export const createPetalMaterial = (
@@ -153,9 +277,12 @@ export const createPetalMaterial = (
     color: 0xffffff,
     roughness: morphology.roughness,
     metalness: 0,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
     vertexColors: true,
   });
+  material.normalMap = getPetalNormalMap();
+  material.normalMapType = THREE.TangentSpaceNormalMap;
+  material.normalScale.set(0.24 + morphology.sssStrength * 0.08, 0.31 + morphology.sssStrength * 0.11);
   material.thicknessColorNode = color(colors.reverse);
   material.thicknessDistortionNode = float(0.16 + morphology.sssStrength * 0.22);
   material.thicknessAmbientNode = float(0.015 + morphology.sssStrength * 0.04);

@@ -6,6 +6,7 @@ WebGPU 기반 실시간 개화 시뮬레이터입니다. 연구 자료에서 확
 
 - 장미, 튤립, 백합, 왕벚나무, 연꽃, 해바라기 6종 프리셋
 - 동일 위상의 닫힘/열림 메시를 이용한 연속 꽃잎 모프
+- 앞·뒤·측면이 닫힌 얇은 꽃잎 셸과 깊이 레인 기반 관통 완화 배치
 - 종별 층·윤생·나선 배열과 시간차 개화
 - 해바라기 320개 통상화의 황금각 배열 및 구심적 개화
 - 꽃잎 수, 층, 길이, 너비, 곡률, 말림, 개방각, 색상 커스터마이징
@@ -23,6 +24,7 @@ Floraxis는 Three.js의 최신 WebGPU 렌더러와 TSL(Render Pipeline)을 사�
 - GTAO(Ground Truth Ambient Occlusion)
 - SSS(Screen-Space Contact Shadows) + 소프트 블러
 - `MeshSSSNodeMaterial` 기반 꽃잎 subsurface scattering
+- 절차적 주맥·측맥 normal map과 실제 측면 셸을 결합한 꽃잎 두께 표현
 - 2K PCF 소프트 섀도 맵
 - Bloom, ACES tone mapping, SMAA
 
@@ -70,7 +72,7 @@ npm run preview
 
 ## GitHub Pages
 
-`main` 브랜치에 push하면 `.github/workflows/deploy-pages.yml`이 테스트와 빌드를 수행한 뒤 `dist`를 GitHub Pages에 배포합니다. 저장소 Settings → Pages → Source가 **GitHub Actions**로 설정되어 있어야 합니다.
+소스는 `main`, 프로덕션 빌드 산출물은 `gh-pages` 브랜치에서 제공합니다. 공개 앱은 [https://sevenword0.github.io/floraxis-webgpu/](https://sevenword0.github.io/floraxis-webgpu/)에서 실행할 수 있습니다.
 
 ## 연구 출처
 

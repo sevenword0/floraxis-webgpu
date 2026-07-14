@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPetalGeometry } from './petal-geometry';
+import { createPetalGeometry, createPetalMaterial, createPetalNormalMap } from './petal-geometry';
 
 describe('petal geometry', () => {
   it('builds matching closed and open morph topologies', () => {
@@ -21,11 +21,12 @@ describe('petal geometry', () => {
     const openPosition = geometry.morphAttributes.position![0];
     const openNormal = geometry.morphAttributes.normal![0];
 
-    expect(position.count).toBe(209);
+    expect(position.count).toBe(418);
     expect(openPosition.count).toBe(position.count);
     expect(openNormal.count).toBe(normal.count);
     expect(color.count).toBe(position.count);
-    expect(geometry.index?.count).toBe(1080);
+    expect(geometry.index?.count).toBe(2496);
+    expect(geometry.userData.petalThickness).toBeGreaterThan(0);
     expect(Array.from(position.array).every(Number.isFinite)).toBe(true);
     expect(Array.from(openPosition.array).every(Number.isFinite)).toBe(true);
     geometry.dispose();
@@ -50,5 +51,22 @@ describe('petal geometry', () => {
     const shoulderY = positions.getY(rowStart + 2);
     expect(centerY).toBeLessThan(shoulderY);
     geometry.dispose();
+  });
+
+  it('creates a non-flat vein normal map and wires it to the petal material', () => {
+    const normalMap = createPetalNormalMap(24, 48);
+    const data = normalMap.image.data as Uint8Array;
+    const redValues = new Set<number>();
+    for (let index = 0; index < data.length; index += 16) redValues.add(data[index]);
+    expect(redValues.size).toBeGreaterThan(8);
+
+    const material = createPetalMaterial(
+      { base: '#9c1538', tip: '#f46f88', reverse: '#70102d', center: '#6f101d', pollen: '#f4c55a', stem: '#315842' },
+      { roughness: 0.62, sssStrength: 0.82 },
+    );
+    expect(material.normalMap?.name).toBe('Floraxis petal veins normal map');
+    expect(material.normalScale.x).toBeGreaterThan(0.25);
+    material.dispose();
+    normalMap.dispose();
   });
 });
