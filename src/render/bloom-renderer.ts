@@ -146,6 +146,7 @@ export class BloomRenderer {
     this.setupPipeline();
     this.setEnvironment(settings.environment);
     this.resize();
+    this.focusFlower();
     this.clock.connect(document);
     this.renderer.setAnimationLoop((time) => this.render(time));
   }
@@ -338,8 +339,10 @@ export class BloomRenderer {
   }
 
   focusFlower(): void {
-    this.camera.position.set(4.1, 2.9, 5.5);
-    this.controls.target.set(0, 1.68, 0);
+    const targetY = 1.68;
+    const narrowScale = this.width / Math.max(1, this.height) < 0.72 ? 1.18 : 1;
+    this.camera.position.set(4.1 * narrowScale, targetY + (2.9 - targetY) * narrowScale, 5.5 * narrowScale);
+    this.controls.target.set(0, targetY, 0);
     this.controls.update();
   }
 

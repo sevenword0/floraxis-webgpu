@@ -302,6 +302,9 @@ const randomizeCustom = (): void => {
     m.openAngle += (Math.random() - 0.5) * 30;
     m.cup += (Math.random() - 0.5) * 0.28;
     m.curl += (Math.random() - 0.5) * 0.38;
+    m.budCurl += (Math.random() - 0.5) * 0.34;
+    m.unfurl += (Math.random() - 0.5) * 0.22;
+    m.innerCoil += (Math.random() - 0.5) * 0.26;
     m.fold += (Math.random() - 0.5) * 0.34;
     m.twist += (Math.random() - 0.5) * 14;
     m.waviness += Math.random() * 0.065;

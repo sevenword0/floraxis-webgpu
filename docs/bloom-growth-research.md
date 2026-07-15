@@ -10,6 +10,9 @@ Floraxis의 개화 모델은 논문에서 관찰된 기관 배열, 상대 크기
 - `marginGrowth`: 중륵보다 가장자리에서 큰 종방향 생장을 곡률 반전과 물결로 변환한 세기
 - `openingStart`, `openingSpan`: 팽윤 뒤 기관이 실제로 벌어지는 시점과 기간
 - `radialSpread`: 개화 중 꽃잎 기부가 바깥으로 이동하는 정도
+- `budCurl`: 봉오리에서 꽃잎 끝이 중심을 감싸는 종방향 말림
+- `unfurl`: 기부가 먼저 이완된 뒤 끝단까지 풀림이 전파되는 시간차
+- `innerCoil`: 완전 개화 뒤에도 중심층에 남는 안쪽 곡률
 
 | 프리셋 | 봉오리 머리 | 닫힌 꽃잎 길이 | 닫힌 꽃잎 너비 | 기부 팽창 | 가장자리 성장 | 배열·순서 |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
@@ -24,7 +27,7 @@ Floraxis의 개화 모델은 논문에서 관찰된 기관 배열, 상대 크기
 
 ### 장미
 
-Rosa hybrida의 Stage 1 봉오리부터 Stage 5 완전 개화까지 꽃잎 면적은 약 6배, 생체중은 약 4배 증가한다. 개방 운동은 꽃잎 판 전체보다 꽃잎–화탁 접합부 약 0.05–0.40 mm 구간의 향축면 세포 팽창과 기부 비후에 의해 주도된다. 이 관찰을 머리·꽃잎 두 축의 성장과 강한 기부 후굴로 나누어 적용했다.
+Rosa hybrida의 Stage 1 봉오리부터 Stage 5 완전 개화까지 꽃잎 면적은 약 6배, 생체중은 약 4배 증가한다. 개방 운동은 꽃잎 판 전체보다 꽃잎–화탁 접합부 약 0.05–0.40 mm 구간의 향축면 세포 팽창과 기부 비후에 의해 주도된다. 이 관찰을 머리·꽃잎 두 축의 성장과 강한 기부 후굴로 나누어 적용했다. 장미 꽃잎은 단일 닫힘/열림 보간 대신 봉오리, 기부 이완, S자 풀림, 끝단 젖힘의 네 포즈를 통과하며, 바깥층이 먼저 열리고 중심층은 일부 안쪽 곡률을 유지한다. 단계별 시간과 곡률 크기는 논문의 형태학적 방향을 실시간 그래픽에 맞춰 정규화한 값이다.
 
 - [Ethylene-regulated asymmetric growth of the petal base promotes flower opening in rose](https://academic.oup.com/plcell/article/33/4/1229/6126472)
 - [Cell Division and Expansion Growth during Rose Petal Development](https://doi.org/10.2503/jjshs1.78.356)

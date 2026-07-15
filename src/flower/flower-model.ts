@@ -5,6 +5,13 @@ import type { Bloomable, BloomGrowthProfile, FlowerPreset } from '../types';
 import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
+import { evaluatePetalUnfurl } from './petal-unfurl';
+
+interface PetalUnfurlMotion {
+  layer: number;
+  wave: number;
+  contactGuard: number;
+}
 
 interface PetalMotion {
   hinge: THREE.Group;
@@ -18,6 +25,7 @@ interface PetalMotion {
   phase: number;
   growth: number;
   span: number;
+  unfurl?: PetalUnfurlMotion;
 }
 
 interface ClearancedPetalMotion extends PetalMotion {
@@ -195,6 +203,7 @@ export class FlowerModel implements Bloomable {
     const { morphology: m, colors } = this.preset;
     const material = this.track(createPetalMaterial(colors, m));
     const layerCounts = this.distributePetals(m.petalCount, m.layers);
+    const usesUnfurl = m.budCurl > 0.01;
 
     for (let layer = 0; layer < m.layers; layer += 1) {
       const count = layerCounts[layer];
@@ -219,6 +228,12 @@ export class FlowerModel implements Bloomable {
         seed: layer + this.preset.id.length,
         thickness: petalThickness,
         growth: petalGrowth,
+        unfurl: usesUnfurl ? {
+          budCurl: m.budCurl * (0.84 + inner * 0.32),
+          wave: m.unfurl,
+          innerCoil: m.innerCoil,
+          layer: inner,
+        } : undefined,
         colors,
       }));
 
@@ -246,9 +261,15 @@ export class FlowerModel implements Bloomable {
         mesh.rotation.y = closedRoll;
         hinge.add(mesh);
         this.head.add(radial);
-        const layerDelay = inner * m.stagger * 0.72;
+        const layerDelay = inner * m.stagger * (usesUnfurl ? 0.92 : 0.72);
         const individualDelay = (index % 3) * 0.006 + Math.sin(index * 11.7) * 0.008;
-        const innerClosure = this.preset.id === 'rose' ? 0.42 : this.preset.id === 'lotus' ? 0.26 : 0.13;
+        const innerClosure = usesUnfurl
+          ? THREE.MathUtils.lerp(0.28, 0.7, m.innerCoil)
+          : this.preset.id === 'rose'
+            ? 0.42
+            : this.preset.id === 'lotus'
+              ? 0.26
+              : 0.13;
         this.petals.push({
           hinge,
           mesh,
@@ -261,6 +282,11 @@ export class FlowerModel implements Bloomable {
           phase: index * 0.73 + layer,
           growth: scale,
           span: Math.max(0.18, this.growth.openingSpan - layerDelay * 0.72),
+          unfurl: usesUnfurl ? {
+            layer: inner,
+            wave: m.unfurl,
+            contactGuard: petalThickness * 1.8 + petalWidth * 0.01,
+          } : undefined,
           radialBase: clearance.radialBase,
           baseLift: clearance.layerLift,
           laneDepth: clearance.laneDepth,
@@ -527,15 +553,31 @@ export class FlowerModel implements Bloomable {
     this.floralBase.rotation.y = Math.sin(subtleTime * 0.22) * 0.006 * attachmentRelease;
     for (const petal of this.petals) {
       const local = remapBloom(progress, petal.delay, petal.span);
-      const angle = THREE.MathUtils.lerp(petal.closedAngle, petal.openAngle, local);
+      const unfurl = petal.unfurl ? evaluatePetalUnfurl(local, petal.unfurl.layer, petal.unfurl.wave) : undefined;
+      const deployment = unfurl?.deployment ?? local;
+      const angle = THREE.MathUtils.lerp(petal.closedAngle, petal.openAngle, deployment);
       const livingMotion = Math.sin(subtleTime * 0.52 + petal.phase) * 0.7 * smoothstep(0.78, 1, progress);
       petal.hinge.rotation.x = (angle + livingMotion) * DEG;
-      petal.hinge.rotation.z = petal.sweep * local;
-      petal.mesh.rotation.y = THREE.MathUtils.lerp(petal.closedRoll, petal.roll, local);
-      const clearance = smoothstep(0.12, 0.88, local);
-      petal.hinge.position.z = petal.radialBase + petal.laneDepth + petal.openDrift * this.growth.radialSpread * clearance;
-      petal.hinge.position.y = petal.baseLift + petal.laneLift * THREE.MathUtils.lerp(0.38, 1, clearance);
-      petal.mesh.morphTargetInfluences![0] = local;
+      const articulation = unfurl ? unfurl.unfurl * 0.72 + unfurl.reflex * 0.28 : local;
+      petal.hinge.rotation.z = petal.sweep * articulation;
+      petal.mesh.rotation.y = THREE.MathUtils.lerp(petal.closedRoll, petal.roll, articulation);
+      const clearance = smoothstep(0.12, 0.88, deployment);
+      const contactSeparation = unfurl?.contactSeparation ?? 0;
+      const laneDepth = petal.laneDepth * (1 + contactSeparation * 0.45);
+      const contactGuard = (petal.unfurl?.contactGuard ?? 0) * contactSeparation;
+      petal.hinge.position.z = petal.radialBase
+        + laneDepth
+        + petal.openDrift * this.growth.radialSpread * clearance
+        + contactGuard;
+      petal.hinge.position.y = petal.baseLift
+        + petal.laneLift * THREE.MathUtils.lerp(0.38, 1 + contactSeparation * 0.26, clearance);
+      if (unfurl) {
+        petal.mesh.morphTargetInfluences![0] = unfurl.weights[0];
+        petal.mesh.morphTargetInfluences![1] = unfurl.weights[1];
+        petal.mesh.morphTargetInfluences![2] = unfurl.weights[2];
+      } else {
+        petal.mesh.morphTargetInfluences![0] = local;
+      }
       petal.mesh.scale.setScalar(1);
     }
     for (const sepal of this.sepals) {

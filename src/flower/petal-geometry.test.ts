@@ -32,6 +32,47 @@ describe('petal geometry', () => {
     geometry.dispose();
   });
 
+  it('builds sequential release, unfurl and reflex poses for coiled petals', () => {
+    const makeGeometry = (layer: number) => createPetalGeometry({
+      length: 1.02,
+      width: 0.62,
+      shape: 'round',
+      taper: 0.42,
+      notch: 0,
+      waviness: 0.04,
+      cup: 0.32,
+      curl: 0.42,
+      fold: 0.26,
+      seed: 17,
+      growth: {
+        closedPetalLength: 0.66,
+        closedPetalWidth: 0.49,
+        basalEpinasty: 0.94,
+        marginGrowth: 0.1,
+      },
+      unfurl: { budCurl: 1.02, wave: 0.62, innerCoil: 0.58, layer },
+      colors: { base: '#9c1538', tip: '#f46f88' },
+    });
+    const outer = makeGeometry(0);
+    const inner = makeGeometry(1);
+    const closed = outer.getAttribute('position');
+    const [released, unfurled, opened] = outer.morphAttributes.position!;
+    const innerOpened = inner.morphAttributes.position![2];
+    const tip = 18 * 11 + 5;
+    const base = 3 * 11 + 5;
+
+    expect(outer.morphAttributes.position).toHaveLength(3);
+    expect(outer.morphAttributes.normal).toHaveLength(3);
+    expect(outer.userData.petalMorphStages).toEqual(['released', 'unfurled', 'open']);
+    expect(released.getZ(base)).toBeGreaterThan(closed.getZ(base));
+    expect(released.getZ(tip)).toBeGreaterThan(closed.getZ(tip));
+    expect(unfurled.getZ(tip)).toBeGreaterThan(released.getZ(tip));
+    expect(opened.getZ(tip)).toBeGreaterThan(unfurled.getZ(tip));
+    expect(innerOpened.getZ(tip)).toBeLessThan(opened.getZ(tip) - 0.08);
+    outer.dispose();
+    inner.dispose();
+  });
+
   it('creates a visible notched tip for sakura-like petals', () => {
     const geometry = createPetalGeometry({
       length: 1,

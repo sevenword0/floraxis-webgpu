@@ -21,8 +21,22 @@ export interface PetalGeometryOptions {
   seed: number;
   thickness?: number;
   growth?: PetalGrowthGeometry;
+  unfurl?: PetalUnfurlGeometryOptions;
   colors: Pick<FlowerColors, 'base' | 'tip'>;
 }
+
+export interface PetalUnfurlGeometryOptions {
+  /** Strength of the inward longitudinal coil in the unopened bud. */
+  budCurl: number;
+  /** How long the distal lamina stays coiled after the petal base releases. */
+  wave: number;
+  /** Residual inward curvature of the innermost layers at anthesis. */
+  innerCoil: number;
+  /** Normalized layer position, where zero is outermost and one is innermost. */
+  layer: number;
+}
+
+type PetalPose = 'closed' | 'released' | 'unfurled' | 'open';
 
 const widthProfile = (v: number, shape: PetalShape, taper: number): number => {
   const base = THREE.MathUtils.smoothstep(v, 0, 0.18);
@@ -48,13 +62,34 @@ const widthProfile = (v: number, shape: PetalShape, taper: number): number => {
 
 const buildPositions = (
   options: PetalGeometryOptions,
-  open: boolean,
+  pose: PetalPose,
   widthSegments: number,
   lengthSegments: number,
 ): Float32Array => {
   const positions = new Float32Array((widthSegments + 1) * (lengthSegments + 1) * 3);
   const phase = options.seed * 1.61803398875;
   const growthProfile = options.growth ?? DEFAULT_GROWTH_PROFILE;
+  const advanced = options.unfurl;
+  const open = pose === 'open';
+  const waveBias = THREE.MathUtils.clamp(advanced?.wave ?? 0, 0, 1);
+  const widthProgress = !advanced
+    ? (open ? 1 : 0)
+    : pose === 'closed'
+      ? 0
+      : pose === 'released'
+        ? 0.24 + (1 - waveBias) * 0.08
+        : pose === 'unfurled'
+          ? 0.78
+          : 1;
+  const axialProgress = !advanced
+    ? (open ? 1 : 0)
+    : pose === 'closed'
+      ? 0
+      : pose === 'released'
+        ? 0.34
+        : pose === 'unfurled'
+          ? 0.8
+          : 1;
   let ptr = 0;
 
   for (let iy = 0; iy <= lengthSegments; iy += 1) {
@@ -67,7 +102,7 @@ const buildPositions = (
         Math.min(1, growthProfile.closedPetalWidth + 0.12),
         v,
       );
-      const expansion = open ? 1 : closedWidth;
+      const expansion = THREE.MathUtils.lerp(closedWidth, 1, widthProgress);
       const x = u * options.width * 0.5 * profile * expansion;
       const tipMask = THREE.MathUtils.smoothstep(v, 0.72, 1);
       const notch = options.notch * options.length * Math.exp(-u * u * 16) * tipMask;
@@ -76,29 +111,78 @@ const buildPositions = (
       const roundedCap = roundedShape
         ? (1 - Math.sqrt(Math.max(0, 1 - u * u))) * options.length * capDepth * tipMask
         : 0;
-      const marginExcess = open
-        ? growthProfile.marginGrowth * Math.pow(Math.abs(u), 2.35) * Math.pow(v, 1.4) * 0.048
-        : 0;
-      const axialGrowth = (open ? 1 : growthProfile.closedPetalLength) + marginExcess;
-      const y = options.length * v * axialGrowth - notch - roundedCap;
+      const marginExcess = growthProfile.marginGrowth
+        * Math.pow(Math.abs(u), 2.35)
+        * Math.pow(v, 1.4)
+        * 0.048
+        * widthProgress;
+      const axialGrowth = THREE.MathUtils.lerp(growthProfile.closedPetalLength, 1, axialProgress) + marginExcess;
       const edge = Math.pow(Math.abs(u), 3.4);
-      const marginWaveGain = open ? 1 + growthProfile.marginGrowth * 0.18 : 0.22 + growthProfile.marginGrowth * 0.06;
+      const marginWaveGain = THREE.MathUtils.lerp(
+        0.22 + growthProfile.marginGrowth * 0.06,
+        1 + growthProfile.marginGrowth * 0.18,
+        widthProgress,
+      );
       const wave = Math.sin(v * 15 + u * 4.5 + phase) * options.waviness * options.length * edge * v * marginWaveGain;
       const midrib = (1 - Math.abs(u)) * Math.sin(Math.PI * v) * options.length * 0.018;
       const transverseCup = (1 - u * u) * Math.sin(Math.PI * v) * options.cup * options.length * 0.28;
       const foldStrength = options.fold ?? 0;
       const foldMask = Math.pow(Math.max(0, Math.sin(Math.PI * v)), 0.82) * THREE.MathUtils.smoothstep(v, 0.04, 0.42);
       const midribCrease = (1 - Math.pow(Math.abs(u), 0.72)) * foldMask * options.length;
-      const longitudinalFold = midribCrease * (open
-        ? foldStrength * 0.12
-        : 0.045 + Math.max(0, foldStrength) * 0.025);
+      const longitudinalFold = midribCrease * THREE.MathUtils.lerp(
+        0.045 + Math.max(0, foldStrength) * 0.025,
+        foldStrength * 0.12,
+        widthProgress,
+      );
       const tipCurl = Math.pow(v, 3.2) * options.curl * options.length * 0.38;
       const closedFold = -Math.pow(v, 2.3) * options.length * (0.16 + Math.max(0, options.curl) * 0.1);
       const basalBand = Math.exp(-Math.pow((v - 0.16) / 0.14, 2)) * (1 - u * u);
       const basalBulge = growthProfile.basalEpinasty * options.length * 0.058 * basalBand;
-      const z = open
-        ? transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge
-        : closedFold + transverseCup * 0.42 + longitudinalFold + wave;
+      let y = options.length * v * axialGrowth - notch - roundedCap;
+      let z: number;
+
+      if (!advanced) {
+        z = open
+          ? transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge
+          : closedFold + transverseCup * 0.42 + longitudinalFold + wave;
+      } else {
+        const layer = THREE.MathUtils.clamp(advanced.layer, 0, 1);
+        const budCurl = THREE.MathUtils.clamp(advanced.budCurl, 0, 1.4);
+        const innerRetention = THREE.MathUtils.clamp(advanced.innerCoil, 0, 1) * layer;
+        const inwardMask = Math.pow(THREE.MathUtils.smoothstep(v, 0.16, 1), 2.15);
+        const distalMask = Math.pow(THREE.MathUtils.smoothstep(v, 0.48, 1), 1.72);
+        const budCoil = -options.length * budCurl * (inwardMask * 0.26 + distalMask * 0.12);
+        const coilRetention = pose === 'closed'
+          ? 1
+          : pose === 'released'
+            ? 0.7 + waveBias * 0.12
+            : pose === 'unfurled'
+              ? 0.12 + innerRetention * 0.28
+              : innerRetention * 0.52;
+        y -= budCurl * options.length * Math.pow(v, 3.05) * 0.08 * coilRetention;
+
+        if (pose === 'closed') {
+          z = budCoil + transverseCup * 0.3 + longitudinalFold + wave * 0.25;
+        } else if (pose === 'released') {
+          z = budCoil * coilRetention
+            + transverseCup * 0.5
+            + longitudinalFold
+            + wave * 0.45
+            + midrib * 0.25
+            + basalBulge * 0.9;
+        } else if (pose === 'unfurled') {
+          z = budCoil * coilRetention
+            + transverseCup * 0.82
+            + longitudinalFold
+            + tipCurl * 0.35
+            + wave * 0.82
+            + midrib * 0.72
+            + basalBulge;
+        } else {
+          const residualCoil = -options.length * innerRetention * distalMask * 0.26;
+          z = transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge + residualCoil;
+        }
+      }
 
       positions[ptr++] = x;
       positions[ptr++] = y;
@@ -196,17 +280,18 @@ export const resolvePetalThickness = (length: number): number => THREE.MathUtils
 export const createPetalGeometry = (options: PetalGeometryOptions): THREE.BufferGeometry => {
   const widthSegments = 10;
   const lengthSegments = 18;
-  const closedSurface = buildPositions(options, false, widthSegments, lengthSegments);
-  const openedSurface = buildPositions(options, true, widthSegments, lengthSegments);
+  const closedSurface = buildPositions(options, 'closed', widthSegments, lengthSegments);
+  const targetPoses: PetalPose[] = options.unfurl ? ['released', 'unfurled', 'open'] : ['open'];
+  const targetSurfaces = targetPoses.map((pose) => buildPositions(options, pose, widthSegments, lengthSegments));
   const surfaceIndices = buildSurfaceIndices(widthSegments, lengthSegments);
   const closedSurfaceNormals = computeNormals(closedSurface, surfaceIndices);
-  const openedSurfaceNormals = computeNormals(openedSurface, surfaceIndices);
+  const targetSurfaceNormals = targetSurfaces.map((surface) => computeNormals(surface, surfaceIndices));
   const thickness = options.thickness ?? resolvePetalThickness(options.length);
   const closed = buildShellPositions(closedSurface, closedSurfaceNormals, thickness);
-  const opened = buildShellPositions(openedSurface, openedSurfaceNormals, thickness);
+  const targets = targetSurfaces.map((surface, index) => buildShellPositions(surface, targetSurfaceNormals[index], thickness));
   const indices = buildShellIndices(surfaceIndices, widthSegments, lengthSegments);
   const closedNormals = computeNormals(closed, indices);
-  const openNormals = computeNormals(opened, indices);
+  const targetNormals = targets.map((target) => computeNormals(target, indices));
   const surfaceCount = (widthSegments + 1) * (lengthSegments + 1);
   const count = surfaceCount * 2;
   const colors = new Float32Array(count * 3);
@@ -237,13 +322,14 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
-  geometry.morphAttributes.position = [new THREE.BufferAttribute(opened, 3)];
-  geometry.morphAttributes.normal = [new THREE.BufferAttribute(openNormals, 3)];
+  geometry.morphAttributes.position = targets.map((target) => new THREE.BufferAttribute(target, 3));
+  geometry.morphAttributes.normal = targetNormals.map((normal) => new THREE.BufferAttribute(normal, 3));
   geometry.morphTargetsRelative = false;
   geometry.userData.petalThickness = thickness;
   geometry.userData.closedPetalLength = options.growth?.closedPetalLength ?? DEFAULT_GROWTH_PROFILE.closedPetalLength;
   geometry.userData.closedPetalWidth = options.growth?.closedPetalWidth ?? DEFAULT_GROWTH_PROFILE.closedPetalWidth;
   geometry.userData.petalFold = options.fold ?? 0;
+  geometry.userData.petalMorphStages = targetPoses;
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

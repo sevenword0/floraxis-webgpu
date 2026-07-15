@@ -61,6 +61,9 @@ export const sanitizePreset = (input: FlowerPreset): FlowerPreset => {
   m.openAngle = Math.min(142, Math.max(18, m.openAngle));
   m.closedAngle = Math.min(28, Math.max(-8, m.closedAngle));
   m.curl = Math.min(1.2, Math.max(-0.35, m.curl));
+  m.budCurl = Math.min(1.4, Math.max(0, Number.isFinite(m.budCurl) ? m.budCurl : 0));
+  m.unfurl = Math.min(1, Math.max(0, Number.isFinite(m.unfurl) ? m.unfurl : 0.45));
+  m.innerCoil = Math.min(1, Math.max(0, Number.isFinite(m.innerCoil) ? m.innerCoil : 0));
   m.fold = Math.min(1.2, Math.max(-0.6, Number.isFinite(m.fold) ? m.fold : 0.22));
   m.twist = Math.min(35, Math.max(-35, Number.isFinite(m.twist) ? m.twist : 0));
   m.cup = Math.min(0.8, Math.max(-0.2, m.cup));

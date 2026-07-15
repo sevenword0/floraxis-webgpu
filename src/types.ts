@@ -22,6 +22,12 @@ export interface FlowerMorphology {
   waviness: number;
   cup: number;
   curl: number;
+  /** Inward longitudinal curl retained by petals in the unopened bud. */
+  budCurl: number;
+  /** Duration bias for the base-to-tip unfurling wave. */
+  unfurl: number;
+  /** Fraction of inward curl retained by the innermost petal layers. */
+  innerCoil: number;
   /** Longitudinal crease strength around the petal midrib at anthesis. */
   fold: number;
   /** Maximum per-petal longitudinal-axis rotation in degrees. */
