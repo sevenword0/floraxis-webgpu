@@ -69,4 +69,42 @@ describe('petal geometry', () => {
     material.dispose();
     normalMap.dispose();
   });
+
+  it('applies species-specific axial and lateral petal growth from bud to anthesis', () => {
+    const geometry = createPetalGeometry({
+      length: 1.2,
+      width: 0.7,
+      shape: 'round',
+      taper: 0.4,
+      notch: 0,
+      waviness: 0.03,
+      cup: 0.25,
+      curl: 0.35,
+      seed: 11,
+      growth: {
+        closedPetalLength: 0.66,
+        closedPetalWidth: 0.49,
+        basalEpinasty: 0.94,
+        marginGrowth: 0.1,
+      },
+      colors: { base: '#8d1836', tip: '#f38192' },
+    });
+    const closed = geometry.getAttribute('position');
+    const opened = geometry.morphAttributes.position![0];
+    const extent = (attribute: typeof closed, axis: 'x' | 'y'): number => {
+      let min = Number.POSITIVE_INFINITY;
+      let max = Number.NEGATIVE_INFINITY;
+      for (let index = 0; index < attribute.count; index += 1) {
+        const value = axis === 'x' ? attribute.getX(index) : attribute.getY(index);
+        min = Math.min(min, value);
+        max = Math.max(max, value);
+      }
+      return max - min;
+    };
+
+    expect(extent(closed, 'y')).toBeLessThan(extent(opened, 'y') * 0.75);
+    expect(extent(closed, 'x')).toBeLessThan(extent(opened, 'x') * 0.65);
+    expect(geometry.userData.closedPetalLength).toBe(0.66);
+    geometry.dispose();
+  });
 });

@@ -47,6 +47,32 @@ export interface ResearchSource {
   url: string;
 }
 
+export interface BloomGrowthProfile {
+  /** Whole flower-head scale at the unopened-bud stage, relative to full anthesis. */
+  budHeadScale: number;
+  /** Petal/tepal axial length at the unopened-bud stage, relative to full anthesis. */
+  closedPetalLength: number;
+  /** Petal/tepal lateral width at the unopened-bud stage, relative to full anthesis. */
+  closedPetalWidth: number;
+  /** Timeline point at which pre-anthesis bud swelling is mostly complete. */
+  swellingEnd: number;
+  /** Timeline point at which visible petal deployment begins. */
+  openingStart: number;
+  /** Normalized duration of the main petal-deployment phase. */
+  openingSpan: number;
+  /** Strength of adaxial petal-base expansion/epinasty in the visual model. */
+  basalEpinasty: number;
+  /** Strength of longitudinal excess growth at the petal margins. */
+  marginGrowth: number;
+  /** Multiplier for radial petal-base separation during anthesis. */
+  radialSpread: number;
+  /** Timeline point at which stamens and gynoecium begin to become visible. */
+  reproductiveReveal: number;
+  arrangement: string;
+  observations: string[];
+  mappingNote: string;
+}
+
 export interface FlowerPreset {
   id: string;
   name: string;
@@ -59,6 +85,8 @@ export interface FlowerPreset {
   kind: FlowerKind;
   colors: FlowerColors;
   morphology: FlowerMorphology;
+  /** Optional for backward compatibility with previously exported custom presets. */
+  growth?: BloomGrowthProfile;
   sources: ResearchSource[];
 }
 

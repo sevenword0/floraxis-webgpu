@@ -6,10 +6,13 @@ WebGPU 기반 실시간 개화 시뮬레이터입니다. 연구 자료에서 확
 
 - 장미, 튤립, 백합, 왕벚나무, 연꽃, 해바라기 6종 프리셋
 - 동일 위상의 닫힘/열림 메시를 이용한 연속 꽃잎 모프
+- 논문 관찰을 정규화한 종별 봉오리 크기·꽃잎 길이/너비 성장 곡선
+- 장미 기부 비대칭 성장, 백합 가장자리 초과 성장, 연꽃 안쪽 꽃잎 후기 신장
 - 앞·뒤·측면이 닫힌 얇은 꽃잎 셸과 깊이 레인 기반 관통 완화 배치
 - 종별 층·윤생·나선 배열과 시간차 개화
-- 해바라기 320개 통상화의 황금각 배열 및 구심적 개화
+- 해바라기 56개 설상화와 480개 통상화의 황금각 배열 및 구심적 개화
 - 꽃잎 수, 층, 길이, 너비, 곡률, 말림, 개방각, 색상 커스터마이징
+- 봉오리 크기, 닫힌 꽃잎 비율, 기부 팽창, 가장자리 성장, 개방 시점 커스터마이징
 - 커스텀 프리셋 브라우저 저장, JSON 내보내기/가져오기
 - 식물학 구조와 개화 메커니즘을 보여 주는 연구 노트
 - 반응형 데스크톱/모바일 인터페이스
@@ -42,6 +45,8 @@ SSGI에 필요한 GPU 기능이 없으면 해당 효과만 자동으로 비활�
 | 해바라기 | 바깥 설상화, 황금각 통상화, 바깥에서 안으로 진행하는 개화 |
 
 이 프로젝트는 관찰 가능한 외형 변화를 위한 교육·시각화 모델입니다. 세포 및 분자 수준의 생장 전체를 계산하는 생물역학 해석기는 아닙니다.
+
+종별 관찰값과 정규화 계수의 대응은 [개화 성장 프로파일 연구 노트](./docs/bloom-growth-research.md)에 정리했습니다.
 
 ## 실행
 
@@ -80,9 +85,11 @@ npm run preview
 - [Ethylene-regulated asymmetric growth of the petal base promotes flower opening in rose (The Plant Cell)](https://academic.oup.com/plcell/article/33/4/1229/6126472)
 - [Cell Division and Expansion Growth during Rose Petal Development](https://doi.org/10.2503/jjshs1.78.356)
 - [Thermonasty in Tulip and Crocus Flowers](https://doi.org/10.1093/jxb/4.1.65)
-- [Prunus floral morphology — Kew Plants of the World Online](https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:30003057-2/general-information)
-- [Nelumbo nucifera — Kew Plants of the World Online](https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:605422-1/general-information)
-- [Helianthus annuus — Kew Plants of the World Online](https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:119003-2/general-information)
+- [Phosphorylation of Plasma Membrane Aquaporin Regulates Temperature-Dependent Opening of Tulip Petals](https://doi.org/10.1093/pcp/pch069)
+- [사쿠라 꽃잎의 발육에 따른 안토시아닌 축적](https://da.lib.kobe-u.ac.jp/da/kernel/00227252/)
+- [Structural changes in Nelumbo flower petals during opening and closing](https://doi.org/10.1002/ajb2.16433)
+- [Floral Development of Nelumbo nucifera](https://doi.org/10.1086/317577)
+- [Are capitula inflorescences? — Helianthus annuus development](https://academic.oup.com/aob/article/137/1/47/8195846)
 - [WebGPURenderer — Three.js manual](https://threejs.org/manual/en/webgpurenderer)
 
 모든 3D 형태와 재질은 런타임에 절차적으로 생성되며 외부 모델·텍스처 자산을 사용하지 않습니다.

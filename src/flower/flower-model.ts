@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { color, float } from 'three/tsl';
-import type { Bloomable, FlowerPreset } from '../types';
+import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } from '../growth-model';
+import type { Bloomable, BloomGrowthProfile, FlowerPreset } from '../types';
 import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computePetalClearance } from './petal-layout';
@@ -14,6 +15,7 @@ interface PetalMotion {
   twist: number;
   phase: number;
   growth: number;
+  span: number;
 }
 
 interface ClearancedPetalMotion extends PetalMotion {
@@ -42,6 +44,7 @@ export class FlowerModel implements Bloomable {
   readonly petalCount: number;
 
   private readonly preset: FlowerPreset;
+  private readonly growth: BloomGrowthProfile;
   private readonly head = new THREE.Group();
   private readonly petals: ClearancedPetalMotion[] = [];
   private readonly sepals: PetalMotion[] = [];
@@ -55,6 +58,7 @@ export class FlowerModel implements Bloomable {
 
   constructor(preset: FlowerPreset) {
     this.preset = preset;
+    this.growth = resolveGrowthProfile(preset);
     this.petalCount = preset.morphology.petalCount + (preset.kind === 'sunflower' ? preset.morphology.discCount : 0);
     this.root.name = `flower-${preset.id}`;
     this.buildStem();
@@ -127,6 +131,9 @@ export class FlowerModel implements Bloomable {
       const petalLength = m.petalLength * scale;
       const petalWidth = m.petalWidth * (1 - inner * m.layerScale * 0.62);
       const petalThickness = resolvePetalThickness(petalLength);
+      const petalGrowth = this.preset.id === 'lotus'
+        ? { ...this.growth, closedPetalLength: Math.max(0.42, this.growth.closedPetalLength - inner * 0.08) }
+        : this.growth;
       const geometry = this.track(createPetalGeometry({
         length: petalLength,
         width: petalWidth,
@@ -138,6 +145,7 @@ export class FlowerModel implements Bloomable {
         curl: m.curl * (1 - inner * 0.28),
         seed: layer + this.preset.id.length,
         thickness: petalThickness,
+        growth: petalGrowth,
         colors,
       }));
 
@@ -163,18 +171,19 @@ export class FlowerModel implements Bloomable {
         mesh.rotation.y = (Math.sin(index * 8.13 + layer) * m.twist * 0.24) * DEG + clearance.weaveYaw;
         hinge.add(mesh);
         this.head.add(radial);
-        const layerDelay = inner * m.stagger;
+        const layerDelay = inner * m.stagger * 0.72;
         const individualDelay = (index % 3) * 0.006 + Math.sin(index * 11.7) * 0.008;
         const innerClosure = this.preset.id === 'rose' ? 0.42 : this.preset.id === 'lotus' ? 0.26 : 0.13;
         this.petals.push({
           hinge,
           mesh,
-          delay: Math.max(0, 0.1 + layerDelay + individualDelay),
+          delay: Math.max(0, this.growth.openingStart + layerDelay + individualDelay),
           openAngle: m.openAngle * (1 - inner * innerClosure),
           closedAngle: m.closedAngle + inner * 2,
           twist: (Math.sin(index * 2.41 + layer) * m.twist) * DEG,
           phase: index * 0.73 + layer,
           growth: scale,
+          span: Math.max(0.18, this.growth.openingSpan - layerDelay * 0.72),
           radialBase: clearance.radialBase,
           baseLift: clearance.layerLift,
           laneDepth: clearance.laneDepth,
@@ -211,6 +220,7 @@ export class FlowerModel implements Bloomable {
       curl: m.curl,
       seed: 93,
       thickness: rayThickness,
+      growth: this.growth,
       colors,
     }));
     for (let index = 0; index < m.petalCount; index += 1) {
@@ -238,12 +248,13 @@ export class FlowerModel implements Bloomable {
       this.petals.push({
         hinge,
         mesh,
-        delay: 0.12 + (index % 4) * 0.008,
+        delay: this.growth.openingStart + (index % 4) * 0.008,
         openAngle: m.openAngle + Math.sin(index * 1.7) * 4,
         closedAngle: m.closedAngle,
         twist: Math.sin(index * 2.3) * m.twist * DEG,
         phase: index * 0.58,
         growth: 1,
+        span: this.growth.openingSpan,
         radialBase,
         baseLift: 0.1,
         laneDepth: clearance.laneDepth,
@@ -252,8 +263,8 @@ export class FlowerModel implements Bloomable {
       });
     }
 
-    const floretGeometry = this.track(new THREE.ConeGeometry(0.032, 0.12, 6));
-    floretGeometry.translate(0, 0.06, 0);
+    const floretGeometry = this.track(new THREE.ConeGeometry(0.026, 0.078, 6));
+    floretGeometry.translate(0, 0.039, 0);
     const floretMaterial = this.track(new THREE.MeshStandardNodeMaterial({ color: colors.pollen, roughness: 0.9 }));
     this.discMesh = new THREE.InstancedMesh(floretGeometry, floretMaterial, m.discCount);
     this.discMesh.castShadow = true;
@@ -301,7 +312,7 @@ export class FlowerModel implements Bloomable {
       hinge.add(mesh);
       radial.add(hinge);
       this.head.add(radial);
-      this.sepals.push({ hinge, mesh, delay: 0.03, openAngle: 124, closedAngle: -2, twist: 0, phase: index, growth: 1 });
+      this.sepals.push({ hinge, mesh, delay: 0.03, openAngle: 124, closedAngle: -2, twist: 0, phase: index, growth: 1, span: 0.48 });
     }
   }
 
@@ -384,28 +395,29 @@ export class FlowerModel implements Bloomable {
   update(progress: number, time: number): void {
     const m = this.preset.morphology;
     const subtleTime = time * 0.001;
+    const headGrowth = evaluateHeadGrowth(this.growth, progress);
+    this.head.scale.setScalar(m.flowerScale * headGrowth);
     for (const petal of this.petals) {
-      const local = remapBloom(progress, petal.delay, 0.72 - petal.delay * 0.18);
+      const local = remapBloom(progress, petal.delay, petal.span);
       const angle = THREE.MathUtils.lerp(petal.closedAngle, petal.openAngle, local);
       const livingMotion = Math.sin(subtleTime * 0.52 + petal.phase) * 0.7 * smoothstep(0.78, 1, progress);
       petal.hinge.rotation.x = (angle + livingMotion) * DEG;
       petal.hinge.rotation.z = petal.twist * local;
       const clearance = smoothstep(0.12, 0.88, local);
-      petal.hinge.position.z = petal.radialBase + petal.laneDepth + petal.openDrift * clearance;
+      petal.hinge.position.z = petal.radialBase + petal.laneDepth + petal.openDrift * this.growth.radialSpread * clearance;
       petal.hinge.position.y = petal.baseLift + petal.laneLift * THREE.MathUtils.lerp(0.38, 1, clearance);
       petal.mesh.morphTargetInfluences![0] = local;
-      const expansion = THREE.MathUtils.lerp(0.9, 1, smoothstep(0.08, 0.58, progress));
-      petal.mesh.scale.set(expansion, expansion, expansion);
+      petal.mesh.scale.setScalar(1);
     }
     for (const sepal of this.sepals) {
       const local = remapBloom(progress, sepal.delay, 0.48);
       sepal.hinge.rotation.x = THREE.MathUtils.lerp(sepal.closedAngle, sepal.openAngle, local) * DEG;
       sepal.mesh.morphTargetInfluences![0] = local;
     }
-    const reveal = smoothstep(0.4, 0.78, progress);
+    const reveal = evaluateReproductiveReveal(this.growth, progress);
     this.stamenGroup.scale.setScalar(Math.max(0.03, reveal));
     this.stamenGroup.position.y = THREE.MathUtils.lerp(-0.08, 0, reveal);
-    for (const object of this.revealGroups) object.visible = progress > 0.34;
+    for (const object of this.revealGroups) object.visible = progress > this.growth.reproductiveReveal - 0.04;
 
     if (this.discMesh && (Math.abs(progress - this.lastProgress) > 0.001 || progress === 0 || progress === 1)) {
       this.discFlorets.forEach((floret, index) => {

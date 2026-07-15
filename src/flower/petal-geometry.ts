@@ -1,6 +1,12 @@
 import * as THREE from 'three/webgpu';
 import { color, float } from 'three/tsl';
-import type { FlowerColors, FlowerMorphology, PetalShape } from '../types';
+import { DEFAULT_GROWTH_PROFILE } from '../growth-model';
+import type { BloomGrowthProfile, FlowerColors, FlowerMorphology, PetalShape } from '../types';
+
+type PetalGrowthGeometry = Pick<
+  BloomGrowthProfile,
+  'closedPetalLength' | 'closedPetalWidth' | 'basalEpinasty' | 'marginGrowth'
+>;
 
 export interface PetalGeometryOptions {
   length: number;
@@ -13,6 +19,7 @@ export interface PetalGeometryOptions {
   curl: number;
   seed: number;
   thickness?: number;
+  growth?: PetalGrowthGeometry;
   colors: Pick<FlowerColors, 'base' | 'tip'>;
 }
 
@@ -46,6 +53,7 @@ const buildPositions = (
 ): Float32Array => {
   const positions = new Float32Array((widthSegments + 1) * (lengthSegments + 1) * 3);
   const phase = options.seed * 1.61803398875;
+  const growthProfile = options.growth ?? DEFAULT_GROWTH_PROFILE;
   let ptr = 0;
 
   for (let iy = 0; iy <= lengthSegments; iy += 1) {
@@ -53,7 +61,12 @@ const buildPositions = (
     for (let ix = 0; ix <= widthSegments; ix += 1) {
       const u = ix / widthSegments * 2 - 1;
       const profile = widthProfile(v, options.shape, options.taper);
-      const expansion = open ? 1 : 0.72 + v * 0.15;
+      const closedWidth = THREE.MathUtils.lerp(
+        growthProfile.closedPetalWidth,
+        Math.min(1, growthProfile.closedPetalWidth + 0.12),
+        v,
+      );
+      const expansion = open ? 1 : closedWidth;
       const x = u * options.width * 0.5 * profile * expansion;
       const tipMask = THREE.MathUtils.smoothstep(v, 0.72, 1);
       const notch = options.notch * options.length * Math.exp(-u * u * 16) * tipMask;
@@ -62,15 +75,23 @@ const buildPositions = (
       const roundedCap = roundedShape
         ? (1 - Math.sqrt(Math.max(0, 1 - u * u))) * options.length * capDepth * tipMask
         : 0;
-      const growth = open ? 1.035 : 0.91;
-      const y = options.length * v * growth - notch - roundedCap;
+      const marginExcess = open
+        ? growthProfile.marginGrowth * Math.pow(Math.abs(u), 2.35) * Math.pow(v, 1.4) * 0.048
+        : 0;
+      const axialGrowth = (open ? 1 : growthProfile.closedPetalLength) + marginExcess;
+      const y = options.length * v * axialGrowth - notch - roundedCap;
       const edge = Math.pow(Math.abs(u), 3.4);
-      const wave = Math.sin(v * 15 + u * 4.5 + phase) * options.waviness * options.length * edge * v;
+      const marginWaveGain = open ? 1 + growthProfile.marginGrowth * 0.18 : 0.22 + growthProfile.marginGrowth * 0.06;
+      const wave = Math.sin(v * 15 + u * 4.5 + phase) * options.waviness * options.length * edge * v * marginWaveGain;
       const midrib = (1 - Math.abs(u)) * Math.sin(Math.PI * v) * options.length * 0.018;
       const transverseCup = (1 - u * u) * Math.sin(Math.PI * v) * options.cup * options.length * 0.28;
       const tipCurl = Math.pow(v, 3.2) * options.curl * options.length * 0.38;
       const closedFold = -Math.pow(v, 2.3) * options.length * (0.16 + Math.max(0, options.curl) * 0.1);
-      const z = open ? transverseCup + tipCurl + wave + midrib : closedFold + transverseCup * 0.42 + wave * 0.25;
+      const basalBand = Math.exp(-Math.pow((v - 0.16) / 0.14, 2)) * (1 - u * u);
+      const basalBulge = growthProfile.basalEpinasty * options.length * 0.058 * basalBand;
+      const z = open
+        ? transverseCup + tipCurl + wave + midrib + basalBulge
+        : closedFold + transverseCup * 0.42 + wave;
 
       positions[ptr++] = x;
       positions[ptr++] = y;
@@ -213,6 +234,8 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.morphAttributes.normal = [new THREE.BufferAttribute(openNormals, 3)];
   geometry.morphTargetsRelative = false;
   geometry.userData.petalThickness = thickness;
+  geometry.userData.closedPetalLength = options.growth?.closedPetalLength ?? DEFAULT_GROWTH_PROFILE.closedPetalLength;
+  geometry.userData.closedPetalWidth = options.growth?.closedPetalWidth ?? DEFAULT_GROWTH_PROFILE.closedPetalWidth;
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

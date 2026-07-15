@@ -1,4 +1,5 @@
 import type { BloomStage, FlowerPreset } from './types';
+import { normalizeGrowthProfile } from './growth-model';
 
 export const BLOOM_STAGES: BloomStage[] = [
   { id: 'bud', label: '꽃봉오리', range: [0, 0.14], detail: '화피가 중심 기관을 감싸 보호합니다.' },
@@ -67,6 +68,7 @@ export const sanitizePreset = (input: FlowerPreset): FlowerPreset => {
   m.roughness = Math.min(1, Math.max(0.1, m.roughness));
   m.stamens = Math.round(Math.min(90, Math.max(0, m.stamens)));
   m.discCount = Math.round(Math.min(520, Math.max(0, m.discCount)));
+  preset.growth = normalizeGrowthProfile(preset.growth);
   return preset;
 };
 

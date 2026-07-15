@@ -1,7 +1,8 @@
 import './style.css';
 import { DEFAULT_PRESET, PRESETS } from './data/presets';
+import { resolveGrowthProfile } from './growth-model';
 import { BloomRenderer } from './render/bloom-renderer';
-import type { AppState, FlowerPreset, RenderSettings } from './types';
+import type { AppState, BloomGrowthProfile, FlowerPreset, RenderSettings } from './types';
 import {
   BLOOM_STAGES,
   clamp01,
@@ -125,6 +126,15 @@ const updateMorphologyUI = (): void => {
     const unit = input.dataset.unit ?? '';
     output.value = `${Number.isInteger(Number(input.step)) ? Math.round(value) : Number(value.toFixed(3))}${unit}`;
   });
+  const growth = resolveGrowthProfile(state.preset);
+  qsa<HTMLInputElement>('[data-growth]').forEach((input) => {
+    const key = input.dataset.growth as keyof BloomGrowthProfile;
+    const value = growth[key];
+    if (typeof value !== 'number') return;
+    input.value = String(value);
+    updateRangeVisual(input);
+    qs<HTMLOutputElement>(`[data-growth-output="${key}"]`).value = `${Math.round(value * 100)}%`;
+  });
   qsa<HTMLInputElement>('[data-color]').forEach((input) => {
     const key = input.dataset.color as 'base' | 'tip' | 'center';
     input.value = state.preset.colors[key];
@@ -135,6 +145,7 @@ const updateMorphologyUI = (): void => {
 };
 
 const updateResearchUI = (): void => {
+  const growth = resolveGrowthProfile(state.preset);
   qs<HTMLElement>('#research-title').textContent = `${state.preset.name} · 개화 연구 노트`;
   qs<HTMLElement>('#research-mechanism').textContent = state.preset.bloomMechanism;
   qs<HTMLElement>('#research-structure').replaceChildren(...state.preset.structure.map((item) => {
@@ -142,6 +153,27 @@ const updateResearchUI = (): void => {
     li.textContent = item;
     return li;
   }));
+  const growthMetrics = [
+    ['꽃봉오리 머리', `${Math.round(growth.budHeadScale * 100)} → 100%`],
+    ['꽃잎 길이', `${Math.round(growth.closedPetalLength * 100)} → 100%`],
+    ['꽃잎 너비', `${Math.round(growth.closedPetalWidth * 100)} → 100%`],
+    ['기관 배치', growth.arrangement],
+  ];
+  qs<HTMLElement>('#research-growth').replaceChildren(...growthMetrics.map(([label, value]) => {
+    const item = document.createElement('div');
+    const title = document.createElement('span');
+    const output = document.createElement('strong');
+    title.textContent = label;
+    output.textContent = value;
+    item.append(title, output);
+    return item;
+  }));
+  qs<HTMLElement>('#research-evidence').replaceChildren(...growth.observations.map((observation) => {
+    const li = document.createElement('li');
+    li.textContent = observation;
+    return li;
+  }));
+  qs<HTMLElement>('#research-mapping').textContent = growth.mappingNote;
   qs<HTMLElement>('#research-sources').replaceChildren(...state.preset.sources.map((source) => {
     const link = document.createElement('a');
     link.href = source.url;
@@ -364,6 +396,18 @@ const wireEvents = (): void => {
       const key = input.dataset.path as keyof FlowerPreset['morphology'];
       applyCustomChange((preset) => {
         (preset.morphology as unknown as Record<string, number>)[key] = Number(input.value);
+      });
+    });
+  });
+
+  qsa<HTMLInputElement>('[data-growth]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const key = input.dataset.growth as keyof BloomGrowthProfile;
+      applyCustomChange((preset) => {
+        const inherited = resolveGrowthProfile(preset);
+        preset.growth ??= { ...inherited, observations: [...inherited.observations] };
+        (preset.growth as unknown as Record<string, number>)[key] = Number(input.value);
+        preset.growth.mappingNote = '기준 종의 연구 프로파일을 사용자가 조정한 정규화 계수입니다.';
       });
     });
   });
