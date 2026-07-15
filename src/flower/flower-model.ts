@@ -72,7 +72,11 @@ export class FlowerModel implements Bloomable {
     this.growth = resolveGrowthProfile(preset);
     this.attachmentLayout = computeFloralAttachment({
       headRadius: preset.morphology.headRadius,
+      petalCount: preset.morphology.petalCount,
+      layers: preset.morphology.layers,
       petalWidth: preset.morphology.petalWidth,
+      petalThickness: resolvePetalThickness(preset.morphology.petalLength),
+      radialSpread: this.growth.radialSpread,
       sepalLength: preset.morphology.sepalLength,
       stemRadius: preset.morphology.stemRadius,
       sunflower: preset.kind === 'sunflower',
@@ -167,6 +171,23 @@ export class FlowerModel implements Bloomable {
     collar.receiveShadow = true;
 
     this.floralBase.add(collar, receptacle);
+    if (this.preset.kind !== 'sunflower') {
+      const seatHeight = Math.max(0.018, baseDepth * 0.22);
+      const seatGeometry = this.track(new THREE.CylinderGeometry(
+        baseRadius * 0.78,
+        baseRadius * 0.98,
+        seatHeight,
+        32,
+        2,
+      ));
+      const seatMaterial = this.track(makeStandardMaterial({ color: colors.base, roughness: Math.min(0.9, m.roughness + 0.08) }));
+      const petalSeat = new THREE.Mesh(seatGeometry, seatMaterial);
+      petalSeat.name = 'petal-attachment-seat';
+      petalSeat.position.y = baseDepth * 0.26;
+      petalSeat.castShadow = true;
+      petalSeat.receiveShadow = true;
+      this.floralBase.add(petalSeat);
+    }
     this.head.add(this.floralBase);
   }
 
@@ -372,7 +393,9 @@ export class FlowerModel implements Bloomable {
       colors: sepalColors,
     }));
     const isSunflower = this.preset.kind === 'sunflower';
-    const openAngle = isSunflower ? 138 : this.preset.id === 'lotus' ? 108 : 116;
+    // Reflex the calyx far enough below the corolla that a front-facing sepal
+    // cannot project back through the open petal cup at oblique camera angles.
+    const openAngle = isSunflower ? 138 : this.preset.id === 'lotus' ? 118 : 128;
     const delay = Math.max(0.015, this.growth.openingStart - (isSunflower ? 0.08 : 0.1));
     const span = Math.min(0.62, Math.max(0.3, this.growth.openingSpan * (isSunflower ? 0.9 : 0.72)));
     for (let index = 0; index < m.sepalCount; index += 1) {

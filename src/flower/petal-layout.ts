@@ -19,7 +19,11 @@ export interface PetalClearance {
 
 export interface FloralAttachmentOptions {
   headRadius: number;
+  petalCount: number;
+  layers: number;
   petalWidth: number;
+  petalThickness: number;
+  radialSpread: number;
   sepalLength: number;
   stemRadius: number;
   sunflower: boolean;
@@ -29,6 +33,9 @@ export interface FloralAttachmentLayout {
   baseRadius: number;
   baseDepth: number;
   collarHeight: number;
+  petalBaseRadius: number;
+  petalClosedEnvelope: number;
+  petalOpenEnvelope: number;
   sepalRadius: number;
   sepalBaseLift: number;
   sepalOpenDrift: number;
@@ -66,26 +73,60 @@ export const computePetalClearance = (options: PetalClearanceOptions): PetalClea
  */
 export const computeFloralAttachment = (options: FloralAttachmentOptions): FloralAttachmentLayout => {
   const headRadius = Math.max(0.08, options.headRadius);
+  const outerCount = Math.max(3, Math.ceil(options.petalCount / Math.max(1, options.layers)));
+  const outerPetal = computePetalClearance({
+    width: options.petalWidth,
+    count: outerCount,
+    index: 0,
+    layer: 0,
+    layers: options.layers,
+    headRadius,
+    thickness: options.petalThickness,
+  });
+  const petalBaseRadius = options.sunflower
+    ? Math.max(headRadius * 0.88, outerPetal.radialBase)
+    : outerPetal.radialBase;
+  const petalClosedEnvelope = petalBaseRadius + Math.abs(outerPetal.laneDepth);
+  const petalOpenEnvelope = petalClosedEnvelope
+    + outerPetal.openDrift * options.radialSpread * (options.sunflower ? 0.55 : 1);
   const baseRadius = options.sunflower
-    ? headRadius * 0.94
+    ? Math.max(headRadius * 0.94, petalBaseRadius + options.petalThickness * 0.55)
     : clamp(
-      Math.max(headRadius * 0.84, options.petalWidth * 0.24),
+      Math.max(
+        headRadius * 0.84,
+        options.petalWidth * 0.24,
+        petalBaseRadius + options.petalThickness * 0.65,
+      ),
       headRadius * 0.78,
-      headRadius * 1.16,
+      headRadius * 1.65,
     );
   const baseDepth = clamp(baseRadius * (options.sunflower ? 0.26 : 0.34), 0.055, 0.22);
   const collarHeight = clamp(options.sepalLength * 0.2 + options.stemRadius * 0.72, 0.1, 0.24);
-  const sepalRadius = options.sunflower
-    ? headRadius * 0.91
-    : clamp(baseRadius * 1.02, headRadius * 0.8, headRadius * 1.08);
+  const sepalOpenDrift = options.sepalLength * (options.sunflower ? 0.12 : 0.08);
+  const sepalClearance = options.petalThickness * 1.2;
+  const requiredSepalRadius = Math.max(
+    petalClosedEnvelope + sepalClearance,
+    petalOpenEnvelope - sepalOpenDrift + sepalClearance,
+  );
+  const sepalRadius = clamp(
+    Math.max(
+      options.sunflower ? headRadius * 0.91 : baseRadius + options.petalThickness * 1.4,
+      requiredSepalRadius,
+    ),
+    headRadius * 0.8,
+    headRadius * 1.95,
+  );
 
   return {
     baseRadius,
     baseDepth,
     collarHeight,
+    petalBaseRadius,
+    petalClosedEnvelope,
+    petalOpenEnvelope,
     sepalRadius,
-    sepalBaseLift: -Math.max(0.035, baseDepth * 0.46),
-    sepalOpenDrift: options.sepalLength * (options.sunflower ? 0.12 : 0.08),
-    sepalDrop: options.sepalLength * (options.sunflower ? 0.16 : 0.1),
+    sepalBaseLift: -Math.max(options.sunflower ? 0.055 : 0.042, baseDepth * (options.sunflower ? 0.46 : 0.64)),
+    sepalOpenDrift,
+    sepalDrop: options.sepalLength * (options.sunflower ? 0.16 : 0.12),
   };
 };
