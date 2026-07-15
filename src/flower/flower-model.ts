@@ -4,7 +4,7 @@ import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } 
 import type { Bloomable, BloomGrowthProfile, FlowerPreset } from '../types';
 import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
-import { computePetalClearance } from './petal-layout';
+import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 
 interface PetalMotion {
   hinge: THREE.Group;
@@ -12,7 +12,9 @@ interface PetalMotion {
   delay: number;
   openAngle: number;
   closedAngle: number;
-  twist: number;
+  closedRoll: number;
+  roll: number;
+  sweep: number;
   phase: number;
   growth: number;
   span: number;
@@ -24,6 +26,13 @@ interface ClearancedPetalMotion extends PetalMotion {
   laneDepth: number;
   laneLift: number;
   openDrift: number;
+}
+
+interface SepalMotion extends PetalMotion {
+  radialBase: number;
+  baseLift: number;
+  openDrift: number;
+  drop: number;
 }
 
 interface DiscFloret {
@@ -46,8 +55,10 @@ export class FlowerModel implements Bloomable {
   private readonly preset: FlowerPreset;
   private readonly growth: BloomGrowthProfile;
   private readonly head = new THREE.Group();
+  private readonly floralBase = new THREE.Group();
+  private readonly attachmentLayout: ReturnType<typeof computeFloralAttachment>;
   private readonly petals: ClearancedPetalMotion[] = [];
-  private readonly sepals: PetalMotion[] = [];
+  private readonly sepals: SepalMotion[] = [];
   private readonly disposables = new Set<{ dispose(): void }>();
   private readonly revealGroups: THREE.Object3D[] = [];
   private readonly stamenGroup = new THREE.Group();
@@ -59,12 +70,20 @@ export class FlowerModel implements Bloomable {
   constructor(preset: FlowerPreset) {
     this.preset = preset;
     this.growth = resolveGrowthProfile(preset);
+    this.attachmentLayout = computeFloralAttachment({
+      headRadius: preset.morphology.headRadius,
+      petalWidth: preset.morphology.petalWidth,
+      sepalLength: preset.morphology.sepalLength,
+      stemRadius: preset.morphology.stemRadius,
+      sunflower: preset.kind === 'sunflower',
+    });
     this.petalCount = preset.morphology.petalCount + (preset.kind === 'sunflower' ? preset.morphology.discCount : 0);
     this.root.name = `flower-${preset.id}`;
     this.buildStem();
     this.head.position.y = preset.morphology.stemHeight;
     this.head.scale.setScalar(preset.morphology.flowerScale);
     this.root.add(this.head);
+    this.buildFloralAttachment();
     if (preset.kind === 'sunflower') this.buildSunflower();
     else this.buildRadialFlower();
     this.update(0, 0);
@@ -103,6 +122,7 @@ export class FlowerModel implements Bloomable {
         waviness: 0.025,
         cup: 0.16,
         curl: 0.2,
+        fold: 0.24,
         seed: index + 41,
         colors: { base: this.preset.colors.stem, tip: '#6f9c5f' },
       }));
@@ -117,6 +137,37 @@ export class FlowerModel implements Bloomable {
       radial.add(mesh);
       this.root.add(radial);
     });
+  }
+
+  private buildFloralAttachment(): void {
+    const { morphology: m, colors } = this.preset;
+    const { baseRadius, baseDepth, collarHeight } = this.attachmentLayout;
+    const receptacleMaterial = this.track(makeStandardMaterial({ color: colors.stem, roughness: 0.88 }));
+    const collarMaterial = this.track(makeStandardMaterial({ color: new THREE.Color(colors.stem).multiplyScalar(0.72), roughness: 0.94 }));
+
+    const receptacleGeometry = this.track(new THREE.SphereGeometry(1, 32, 14));
+    const receptacle = new THREE.Mesh(receptacleGeometry, receptacleMaterial);
+    receptacle.name = 'floral-receptacle';
+    receptacle.scale.set(baseRadius, baseDepth, baseRadius);
+    receptacle.position.y = -baseDepth * 0.62;
+    receptacle.castShadow = true;
+    receptacle.receiveShadow = true;
+
+    const collarGeometry = this.track(new THREE.CylinderGeometry(
+      Math.max(m.stemRadius * 1.05, baseRadius * 0.38),
+      m.stemRadius * 0.92,
+      collarHeight,
+      24,
+      3,
+    ));
+    const collar = new THREE.Mesh(collarGeometry, collarMaterial);
+    collar.name = 'floral-collar';
+    collar.position.y = -collarHeight * 0.54;
+    collar.castShadow = true;
+    collar.receiveShadow = true;
+
+    this.floralBase.add(collar, receptacle);
+    this.head.add(this.floralBase);
   }
 
   private buildRadialFlower(): void {
@@ -143,6 +194,7 @@ export class FlowerModel implements Bloomable {
         waviness: m.waviness,
         cup: m.cup * (1 + inner * 0.22),
         curl: m.curl * (1 - inner * 0.28),
+        fold: m.fold * (1 + inner * 0.16),
         seed: layer + this.preset.id.length,
         thickness: petalThickness,
         growth: petalGrowth,
@@ -168,7 +220,9 @@ export class FlowerModel implements Bloomable {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        mesh.rotation.y = (Math.sin(index * 8.13 + layer) * m.twist * 0.24) * DEG + clearance.weaveYaw;
+        const closedRoll = clearance.weaveYaw;
+        const roll = (Math.sin(index * 8.13 + layer) * m.twist) * DEG + clearance.weaveYaw;
+        mesh.rotation.y = closedRoll;
         hinge.add(mesh);
         this.head.add(radial);
         const layerDelay = inner * m.stagger * 0.72;
@@ -180,7 +234,9 @@ export class FlowerModel implements Bloomable {
           delay: Math.max(0, this.growth.openingStart + layerDelay + individualDelay),
           openAngle: m.openAngle * (1 - inner * innerClosure),
           closedAngle: m.closedAngle + inner * 2,
-          twist: (Math.sin(index * 2.41 + layer) * m.twist) * DEG,
+          closedRoll,
+          roll,
+          sweep: (Math.sin(index * 2.41 + layer) * m.twist * 0.2) * DEG,
           phase: index * 0.73 + layer,
           growth: scale,
           span: Math.max(0.18, this.growth.openingSpan - layerDelay * 0.72),
@@ -193,7 +249,7 @@ export class FlowerModel implements Bloomable {
       }
     }
 
-    this.buildSepals(m.headRadius * 0.9);
+    this.buildSepals();
     this.buildReproductiveCenter();
   }
 
@@ -218,6 +274,7 @@ export class FlowerModel implements Bloomable {
       waviness: m.waviness,
       cup: m.cup,
       curl: m.curl,
+      fold: m.fold,
       seed: 93,
       thickness: rayThickness,
       growth: this.growth,
@@ -241,7 +298,9 @@ export class FlowerModel implements Bloomable {
       hinge.position.set(0, 0.1 + clearance.laneLift * 0.38, radialBase + clearance.laneDepth);
       const mesh = new THREE.Mesh(rayGeometry, rayMaterial);
       mesh.castShadow = true;
-      mesh.rotation.y = Math.sin(index * 3.1) * 0.024 + clearance.weaveYaw;
+      const closedRoll = clearance.weaveYaw;
+      const roll = Math.sin(index * 3.1) * m.twist * DEG + clearance.weaveYaw;
+      mesh.rotation.y = closedRoll;
       hinge.add(mesh);
       radial.add(hinge);
       this.head.add(radial);
@@ -251,7 +310,9 @@ export class FlowerModel implements Bloomable {
         delay: this.growth.openingStart + (index % 4) * 0.008,
         openAngle: m.openAngle + Math.sin(index * 1.7) * 4,
         closedAngle: m.closedAngle,
-        twist: Math.sin(index * 2.3) * m.twist * DEG,
+        closedRoll,
+        roll,
+        sweep: Math.sin(index * 2.3) * m.twist * 0.18 * DEG,
         phase: index * 0.58,
         growth: 1,
         span: this.growth.openingSpan,
@@ -282,12 +343,13 @@ export class FlowerModel implements Bloomable {
     }
     this.discMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.head.add(this.discMesh);
-    this.buildSepals(m.headRadius * 0.94);
+    this.buildSepals();
   }
 
-  private buildSepals(radius: number): void {
+  private buildSepals(): void {
     const { morphology: m, colors } = this.preset;
     if (m.sepalCount <= 0) return;
+    const placement = this.attachmentLayout;
     const sepalColors = { ...colors, base: colors.stem, tip: '#72925b', reverse: '#294a35' };
     const material = this.track(createPetalMaterial(sepalColors, { roughness: 0.85, sssStrength: 0.3 }));
     const geometry = this.track(createPetalGeometry({
@@ -299,20 +361,49 @@ export class FlowerModel implements Bloomable {
       waviness: 0.025,
       cup: 0.12,
       curl: 0.12,
+      fold: 0.28,
       seed: 117,
+      growth: {
+        closedPetalLength: 0.96,
+        closedPetalWidth: 0.82,
+        basalEpinasty: 0.08,
+        marginGrowth: 0.06,
+      },
       colors: sepalColors,
     }));
+    const isSunflower = this.preset.kind === 'sunflower';
+    const openAngle = isSunflower ? 138 : this.preset.id === 'lotus' ? 108 : 116;
+    const delay = Math.max(0.015, this.growth.openingStart - (isSunflower ? 0.08 : 0.1));
+    const span = Math.min(0.62, Math.max(0.3, this.growth.openingSpan * (isSunflower ? 0.9 : 0.72)));
     for (let index = 0; index < m.sepalCount; index += 1) {
       const radial = new THREE.Group();
       radial.rotation.y = index / m.sepalCount * Math.PI * 2 + GOLDEN_ANGLE * 0.2;
       const hinge = new THREE.Group();
-      hinge.position.set(0, -0.04, radius * 0.18);
+      hinge.position.set(0, placement.sepalBaseLift, placement.sepalRadius);
+      const closedRoll = (index % 2 === 0 ? -1 : 1) * 1.5 * DEG;
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = true;
+      mesh.rotation.y = closedRoll;
       hinge.add(mesh);
       radial.add(hinge);
       this.head.add(radial);
-      this.sepals.push({ hinge, mesh, delay: 0.03, openAngle: 124, closedAngle: -2, twist: 0, phase: index, growth: 1, span: 0.48 });
+      this.sepals.push({
+        hinge,
+        mesh,
+        delay,
+        openAngle,
+        closedAngle: isSunflower ? -8 : -12,
+        closedRoll,
+        roll: (index % 2 === 0 ? -1 : 1) * (isSunflower ? 5 : 3) * DEG,
+        sweep: Math.sin(index * 1.93) * (isSunflower ? 4 : 2.5) * DEG,
+        phase: index,
+        growth: 1,
+        span,
+        radialBase: placement.sepalRadius,
+        baseLift: placement.sepalBaseLift,
+        openDrift: placement.sepalOpenDrift,
+        drop: placement.sepalDrop,
+      });
     }
   }
 
@@ -397,12 +488,27 @@ export class FlowerModel implements Bloomable {
     const subtleTime = time * 0.001;
     const headGrowth = evaluateHeadGrowth(this.growth, progress);
     this.head.scale.setScalar(m.flowerScale * headGrowth);
+    const attachmentSwell = smoothstep(0, this.growth.swellingEnd, progress);
+    const attachmentRelease = smoothstep(
+      this.growth.openingStart,
+      Math.min(1, this.growth.openingStart + this.growth.openingSpan * 0.72),
+      progress,
+    );
+    const attachmentRadius = THREE.MathUtils.lerp(0.84, 1, attachmentSwell);
+    this.floralBase.scale.set(
+      attachmentRadius,
+      THREE.MathUtils.lerp(0.9, 1.04, attachmentSwell),
+      attachmentRadius,
+    );
+    this.floralBase.position.y = THREE.MathUtils.lerp(-this.attachmentLayout.baseDepth * 0.08, 0, attachmentRelease);
+    this.floralBase.rotation.y = Math.sin(subtleTime * 0.22) * 0.006 * attachmentRelease;
     for (const petal of this.petals) {
       const local = remapBloom(progress, petal.delay, petal.span);
       const angle = THREE.MathUtils.lerp(petal.closedAngle, petal.openAngle, local);
       const livingMotion = Math.sin(subtleTime * 0.52 + petal.phase) * 0.7 * smoothstep(0.78, 1, progress);
       petal.hinge.rotation.x = (angle + livingMotion) * DEG;
-      petal.hinge.rotation.z = petal.twist * local;
+      petal.hinge.rotation.z = petal.sweep * local;
+      petal.mesh.rotation.y = THREE.MathUtils.lerp(petal.closedRoll, petal.roll, local);
       const clearance = smoothstep(0.12, 0.88, local);
       petal.hinge.position.z = petal.radialBase + petal.laneDepth + petal.openDrift * this.growth.radialSpread * clearance;
       petal.hinge.position.y = petal.baseLift + petal.laneLift * THREE.MathUtils.lerp(0.38, 1, clearance);
@@ -410,8 +516,14 @@ export class FlowerModel implements Bloomable {
       petal.mesh.scale.setScalar(1);
     }
     for (const sepal of this.sepals) {
-      const local = remapBloom(progress, sepal.delay, 0.48);
-      sepal.hinge.rotation.x = THREE.MathUtils.lerp(sepal.closedAngle, sepal.openAngle, local) * DEG;
+      const local = remapBloom(progress, sepal.delay, sepal.span);
+      const release = smoothstep(0.08, 0.92, local);
+      const livingMotion = Math.sin(subtleTime * 0.42 + sepal.phase) * 0.35 * DEG * smoothstep(0.7, 1, progress);
+      sepal.hinge.rotation.x = THREE.MathUtils.lerp(sepal.closedAngle, sepal.openAngle, local) * DEG + livingMotion;
+      sepal.hinge.rotation.z = sepal.sweep * local;
+      sepal.mesh.rotation.y = THREE.MathUtils.lerp(sepal.closedRoll, sepal.roll, local);
+      sepal.hinge.position.z = sepal.radialBase + sepal.openDrift * release;
+      sepal.hinge.position.y = sepal.baseLift - sepal.drop * release;
       sepal.mesh.morphTargetInfluences![0] = local;
     }
     const reveal = evaluateReproductiveReveal(this.growth, progress);

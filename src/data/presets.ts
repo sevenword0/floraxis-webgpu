@@ -11,6 +11,7 @@ const baseMorphology: FlowerMorphology = {
   waviness: 0.04,
   cup: 0.22,
   curl: 0.28,
+  fold: 0.22,
   twist: 7,
   openAngle: 88,
   closedAngle: 8,
@@ -45,7 +46,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['4층 · 42개 꽃잎', '바깥층 우선 개방', '기부 비대칭 성장', '다수 수술'],
     kind: 'radial',
     colors: { base: '#9c1538', tip: '#f46f88', reverse: '#70102d', center: '#6f101d', pollen: '#f4c55a', stem: '#315842' },
-    morphology: morph({ petalCount: 42, layers: 4, petalLength: 1.02, petalWidth: 0.62, petalShape: 'round', cup: 0.32, curl: 0.42, twist: 11, openAngle: 104, closedAngle: 4, spiral: 0.48, layerScale: 0.15, stamens: 32, stamenLength: 0.38, sepalLength: 0.58, bloomDuration: 14, stagger: 0.42, roughness: 0.62, sssStrength: 0.82 }),
+    morphology: morph({ petalCount: 42, layers: 4, petalLength: 1.02, petalWidth: 0.62, petalShape: 'round', cup: 0.32, curl: 0.42, fold: 0.26, twist: 11, openAngle: 104, closedAngle: 4, spiral: 0.48, layerScale: 0.15, stamens: 32, stamenLength: 0.38, sepalLength: 0.58, bloomDuration: 14, stagger: 0.42, roughness: 0.62, sssStrength: 0.82 }),
     growth: {
       budHeadScale: 0.72,
       closedPetalLength: 0.66,
@@ -80,7 +81,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['2윤생 · 6개 화피', '3+3 방사 대칭', '온도 감응 개폐', '6개 수술'],
     kind: 'radial',
     colors: { base: '#d6412f', tip: '#ff9d55', reverse: '#a82228', center: '#30210f', pollen: '#3f3021', stem: '#3b6e49' },
-    morphology: morph({ petalCount: 6, layers: 2, petalLength: 1.32, petalWidth: 0.78, petalShape: 'spoon', taper: 0.28, waviness: 0.012, cup: 0.46, curl: 0.1, twist: 2, openAngle: 72, closedAngle: 3, spiral: 0, layerScale: 0.04, stamens: 6, stamenLength: 0.58, sepalCount: 0, stemHeight: 2.35, bloomDuration: 10, stagger: 0.12, roughness: 0.5, sssStrength: 0.76 }),
+    morphology: morph({ petalCount: 6, layers: 2, petalLength: 1.32, petalWidth: 0.78, petalShape: 'spoon', taper: 0.28, waviness: 0.012, cup: 0.46, curl: 0.1, fold: 0.12, twist: 2, openAngle: 72, closedAngle: 3, spiral: 0, layerScale: 0.04, stamens: 6, stamenLength: 0.58, sepalCount: 0, stemHeight: 2.35, bloomDuration: 10, stagger: 0.12, roughness: 0.5, sssStrength: 0.76 }),
     growth: {
       budHeadScale: 0.82,
       closedPetalLength: 0.84,
@@ -115,7 +116,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['2윤생 · 6개 화피', '강한 중륵', '끝단 후굴', '긴 6개 수술'],
     kind: 'radial',
     colors: { base: '#f6e5e7', tip: '#fffdf5', reverse: '#e8c2cc', center: '#ca7086', pollen: '#a95a2c', stem: '#3a6649' },
-    morphology: morph({ petalCount: 6, layers: 2, petalLength: 1.55, petalWidth: 0.58, petalShape: 'lance', taper: 0.68, waviness: 0.05, cup: 0.18, curl: 0.68, twist: 7, openAngle: 110, closedAngle: 2, spiral: 0.04, layerScale: 0.08, stamens: 6, stamenLength: 0.92, sepalCount: 0, stemHeight: 2.25, bloomDuration: 11, stagger: 0.16, roughness: 0.66, sssStrength: 0.9 }),
+    morphology: morph({ petalCount: 6, layers: 2, petalLength: 1.55, petalWidth: 0.58, petalShape: 'lance', taper: 0.68, waviness: 0.05, cup: 0.18, curl: 0.68, fold: 0.42, twist: 7, openAngle: 110, closedAngle: 2, spiral: 0.04, layerScale: 0.08, stamens: 6, stamenLength: 0.92, sepalCount: 0, stemHeight: 2.25, bloomDuration: 11, stagger: 0.16, roughness: 0.66, sssStrength: 0.9 }),
     growth: {
       budHeadScale: 0.79,
       closedPetalLength: 0.82,
@@ -150,7 +151,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['5개 꽃잎 · 5개 꽃받침', '끝단 오목 형태', '컵 모양 화탁', '15–80개 수술'],
     kind: 'radial',
     colors: { base: '#f1a9bd', tip: '#fff0f4', reverse: '#df8fac', center: '#cf5f77', pollen: '#f1cc69', stem: '#59483c' },
-    morphology: morph({ petalCount: 5, layers: 1, petalLength: 1.08, petalWidth: 0.8, petalShape: 'notched', taper: 0.24, notch: 0.13, waviness: 0.025, cup: 0.14, curl: 0.18, twist: 3, openAngle: 102, closedAngle: 6, spiral: 0, layerScale: 0, stamens: 26, stamenLength: 0.55, sepalCount: 5, sepalLength: 0.48, stemHeight: 2.05, stemRadius: 0.07, bloomDuration: 8, stagger: 0.08, roughness: 0.72, sssStrength: 0.88 }),
+    morphology: morph({ petalCount: 5, layers: 1, petalLength: 1.08, petalWidth: 0.8, petalShape: 'notched', taper: 0.24, notch: 0.13, waviness: 0.025, cup: 0.14, curl: 0.18, fold: 0.08, twist: 3, openAngle: 102, closedAngle: 6, spiral: 0, layerScale: 0, stamens: 26, stamenLength: 0.55, sepalCount: 5, sepalLength: 0.48, stemHeight: 2.05, stemRadius: 0.07, bloomDuration: 8, stagger: 0.08, roughness: 0.72, sssStrength: 0.88 }),
     growth: {
       budHeadScale: 0.68,
       closedPetalLength: 0.73,
@@ -185,7 +186,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['3층 · 24개 화피', '나선형 기관 배치', '다수 수술', '확대된 원뿔형 화탁'],
     kind: 'radial',
     colors: { base: '#e88da6', tip: '#fff1ed', reverse: '#ca6f8e', center: '#e7b947', pollen: '#f7d36b', stem: '#47715a' },
-    morphology: morph({ petalCount: 24, layers: 3, petalLength: 1.38, petalWidth: 0.64, petalShape: 'pointed', taper: 0.5, waviness: 0.025, cup: 0.38, curl: 0.3, twist: 5, openAngle: 82, closedAngle: 5, spiral: 0.34, layerScale: 0.13, stamens: 54, stamenLength: 0.48, sepalCount: 2, sepalLength: 0.72, stemHeight: 2.25, stemRadius: 0.095, headRadius: 0.26, bloomDuration: 13, stagger: 0.38, roughness: 0.6, sssStrength: 0.84 }),
+    morphology: morph({ petalCount: 24, layers: 3, petalLength: 1.38, petalWidth: 0.64, petalShape: 'pointed', taper: 0.5, waviness: 0.025, cup: 0.38, curl: 0.3, fold: 0.24, twist: 5, openAngle: 82, closedAngle: 5, spiral: 0.34, layerScale: 0.13, stamens: 54, stamenLength: 0.48, sepalCount: 2, sepalLength: 0.72, stemHeight: 2.25, stemRadius: 0.095, headRadius: 0.26, bloomDuration: 13, stagger: 0.38, roughness: 0.6, sssStrength: 0.84 }),
     growth: {
       budHeadScale: 0.74,
       closedPetalLength: 0.75,
@@ -221,7 +222,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['56개 설상화', '480개 통상화', '황금각 나선', '구심적 개화'],
     kind: 'sunflower',
     colors: { base: '#c88012', tip: '#ffd54f', reverse: '#9c6314', center: '#3b2418', pollen: '#e2a832', stem: '#496c39' },
-    morphology: morph({ petalCount: 56, layers: 1, petalLength: 1.16, petalWidth: 0.24, petalShape: 'lance', taper: 0.58, waviness: 0.03, cup: 0.06, curl: 0.18, twist: 3, openAngle: 94, closedAngle: 4, spiral: 0, layerScale: 0, stamens: 0, stamenLength: 0, sepalCount: 18, sepalLength: 0.56, stemHeight: 2.2, stemRadius: 0.11, headRadius: 0.83, flowerScale: 0.95, bloomDuration: 15, stagger: 0.26, roughness: 0.72, sssStrength: 0.58, discCount: 480 }),
+    morphology: morph({ petalCount: 56, layers: 1, petalLength: 1.16, petalWidth: 0.24, petalShape: 'lance', taper: 0.58, waviness: 0.03, cup: 0.06, curl: 0.18, fold: 0.12, twist: 3, openAngle: 94, closedAngle: 4, spiral: 0, layerScale: 0, stamens: 0, stamenLength: 0, sepalCount: 18, sepalLength: 0.56, stemHeight: 2.2, stemRadius: 0.11, headRadius: 0.83, flowerScale: 0.95, bloomDuration: 15, stagger: 0.26, roughness: 0.72, sssStrength: 0.58, discCount: 480 }),
     growth: {
       budHeadScale: 0.78,
       closedPetalLength: 0.56,

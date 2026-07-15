@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computePetalClearance } from './petal-layout';
+import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 
 describe('petal clearance layout', () => {
   it('places adjacent petals in distinct depth lanes', () => {
@@ -19,5 +19,35 @@ describe('petal clearance layout', () => {
 
     expect(inner.layerLift).toBeGreaterThan(outer.layerLift);
     expect(inner.openDrift).toBeGreaterThan(0);
+  });
+
+  it('places ordinary sepals on the receptacle rim instead of the stem axis', () => {
+    const layout = computeFloralAttachment({
+      headRadius: 0.22,
+      petalWidth: 0.8,
+      sepalLength: 0.48,
+      stemRadius: 0.07,
+      sunflower: false,
+    });
+
+    expect(layout.sepalRadius).toBeGreaterThan(0.22 * 0.8);
+    expect(layout.sepalRadius).toBeLessThanOrEqual(0.22 * 1.08);
+    expect(layout.baseRadius).toBeGreaterThan(0.07 * 2);
+    expect(layout.sepalOpenDrift).toBeGreaterThan(0);
+    expect(layout.sepalDrop).toBeGreaterThan(0);
+  });
+
+  it('keeps sunflower involucral bracts close to the capitulum rim', () => {
+    const layout = computeFloralAttachment({
+      headRadius: 0.83,
+      petalWidth: 0.24,
+      sepalLength: 0.56,
+      stemRadius: 0.11,
+      sunflower: true,
+    });
+
+    expect(layout.sepalRadius).toBeCloseTo(0.83 * 0.91);
+    expect(layout.baseRadius).toBeCloseTo(0.83 * 0.94);
+    expect(layout.sepalDrop).toBeGreaterThan(layout.sepalOpenDrift);
   });
 });

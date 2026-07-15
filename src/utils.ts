@@ -61,6 +61,8 @@ export const sanitizePreset = (input: FlowerPreset): FlowerPreset => {
   m.openAngle = Math.min(142, Math.max(18, m.openAngle));
   m.closedAngle = Math.min(28, Math.max(-8, m.closedAngle));
   m.curl = Math.min(1.2, Math.max(-0.35, m.curl));
+  m.fold = Math.min(1.2, Math.max(-0.6, Number.isFinite(m.fold) ? m.fold : 0.22));
+  m.twist = Math.min(35, Math.max(-35, Number.isFinite(m.twist) ? m.twist : 0));
   m.cup = Math.min(0.8, Math.max(-0.2, m.cup));
   m.waviness = Math.min(0.3, Math.max(0, m.waviness));
   m.stagger = Math.min(0.65, Math.max(0, m.stagger));

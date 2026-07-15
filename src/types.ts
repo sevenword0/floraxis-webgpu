@@ -22,6 +22,9 @@ export interface FlowerMorphology {
   waviness: number;
   cup: number;
   curl: number;
+  /** Longitudinal crease strength around the petal midrib at anthesis. */
+  fold: number;
+  /** Maximum per-petal longitudinal-axis rotation in degrees. */
   twist: number;
   openAngle: number;
   closedAngle: number;

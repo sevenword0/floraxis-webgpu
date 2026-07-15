@@ -13,6 +13,8 @@ describe('botanical presets', () => {
       expect(preset.sources.every((source) => source.url.startsWith('https://'))).toBe(true);
       expect(preset.morphology.petalCount).toBeGreaterThanOrEqual(3);
       expect(preset.morphology.bloomDuration).toBeGreaterThan(0);
+      expect(preset.morphology.fold).toBeGreaterThanOrEqual(-0.6);
+      expect(Math.abs(preset.morphology.twist)).toBeLessThanOrEqual(35);
       expect(preset.growth).toBeDefined();
       expect(preset.growth!.budHeadScale).toBeGreaterThanOrEqual(0.48);
       expect(preset.growth!.closedPetalLength).toBeLessThanOrEqual(1);
@@ -36,6 +38,8 @@ describe('botanical presets', () => {
     unsafe.morphology.layers = -3;
     unsafe.morphology.openAngle = 999;
     unsafe.morphology.curl = -9;
+    unsafe.morphology.fold = 9;
+    unsafe.morphology.twist = -90;
     unsafe.growth!.budHeadScale = -1;
     unsafe.growth!.radialSpread = 99;
     const safe = sanitizePreset(unsafe);
@@ -43,7 +47,21 @@ describe('botanical presets', () => {
     expect(safe.morphology.layers).toBe(1);
     expect(safe.morphology.openAngle).toBe(142);
     expect(safe.morphology.curl).toBe(-0.35);
+    expect(safe.morphology.fold).toBe(1.2);
+    expect(safe.morphology.twist).toBe(-35);
     expect(safe.growth?.budHeadScale).toBe(0.48);
     expect(safe.growth?.radialSpread).toBe(1.5);
   });
+
+  it('upgrades legacy custom presets that do not contain a fold control', () => {
+    const legacy = structuredClone(PRESETS[0]) as FlowerPresetWithoutFold;
+    delete legacy.morphology.fold;
+
+    expect(validatePreset(legacy)).toBe(true);
+    expect(sanitizePreset(legacy as unknown as typeof PRESETS[number]).morphology.fold).toBe(0.22);
+  });
 });
+
+type FlowerPresetWithoutFold = Omit<typeof PRESETS[number], 'morphology'> & {
+  morphology: Omit<typeof PRESETS[number]['morphology'], 'fold'> & { fold?: number };
+};

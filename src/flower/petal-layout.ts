@@ -17,6 +17,24 @@ export interface PetalClearance {
   weaveYaw: number;
 }
 
+export interface FloralAttachmentOptions {
+  headRadius: number;
+  petalWidth: number;
+  sepalLength: number;
+  stemRadius: number;
+  sunflower: boolean;
+}
+
+export interface FloralAttachmentLayout {
+  baseRadius: number;
+  baseDepth: number;
+  collarHeight: number;
+  sepalRadius: number;
+  sepalBaseLift: number;
+  sepalOpenDrift: number;
+  sepalDrop: number;
+}
+
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 export const computePetalClearance = (options: PetalClearanceOptions): PetalClearance => {
@@ -38,5 +56,36 @@ export const computePetalClearance = (options: PetalClearanceOptions): PetalClea
     layerLift: layerProgress * (options.width * 0.085 + options.thickness * 2.2),
     openDrift: options.width * 0.055 + options.thickness * 0.55,
     weaveYaw: lane * Math.min(0.032, Math.PI / (count * 7)),
+  };
+};
+
+/**
+ * Keeps the petal bases, receptacle and sepals on one continuous attachment ring.
+ * Sunflower involucral bracts sit near the rim of the capitulum, while ordinary
+ * sepals sit just outside the receptacle rather than at the stem axis.
+ */
+export const computeFloralAttachment = (options: FloralAttachmentOptions): FloralAttachmentLayout => {
+  const headRadius = Math.max(0.08, options.headRadius);
+  const baseRadius = options.sunflower
+    ? headRadius * 0.94
+    : clamp(
+      Math.max(headRadius * 0.84, options.petalWidth * 0.24),
+      headRadius * 0.78,
+      headRadius * 1.16,
+    );
+  const baseDepth = clamp(baseRadius * (options.sunflower ? 0.26 : 0.34), 0.055, 0.22);
+  const collarHeight = clamp(options.sepalLength * 0.2 + options.stemRadius * 0.72, 0.1, 0.24);
+  const sepalRadius = options.sunflower
+    ? headRadius * 0.91
+    : clamp(baseRadius * 1.02, headRadius * 0.8, headRadius * 1.08);
+
+  return {
+    baseRadius,
+    baseDepth,
+    collarHeight,
+    sepalRadius,
+    sepalBaseLift: -Math.max(0.035, baseDepth * 0.46),
+    sepalOpenDrift: options.sepalLength * (options.sunflower ? 0.12 : 0.08),
+    sepalDrop: options.sepalLength * (options.sunflower ? 0.16 : 0.1),
   };
 };

@@ -302,6 +302,8 @@ const randomizeCustom = (): void => {
     m.openAngle += (Math.random() - 0.5) * 30;
     m.cup += (Math.random() - 0.5) * 0.28;
     m.curl += (Math.random() - 0.5) * 0.38;
+    m.fold += (Math.random() - 0.5) * 0.34;
+    m.twist += (Math.random() - 0.5) * 14;
     m.waviness += Math.random() * 0.065;
     const sourceColor = preset.colors.base.slice(1);
     const rgb = Number.parseInt(sourceColor, 16);

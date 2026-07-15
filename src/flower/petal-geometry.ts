@@ -17,6 +17,7 @@ export interface PetalGeometryOptions {
   waviness: number;
   cup: number;
   curl: number;
+  fold?: number;
   seed: number;
   thickness?: number;
   growth?: PetalGrowthGeometry;
@@ -85,13 +86,19 @@ const buildPositions = (
       const wave = Math.sin(v * 15 + u * 4.5 + phase) * options.waviness * options.length * edge * v * marginWaveGain;
       const midrib = (1 - Math.abs(u)) * Math.sin(Math.PI * v) * options.length * 0.018;
       const transverseCup = (1 - u * u) * Math.sin(Math.PI * v) * options.cup * options.length * 0.28;
+      const foldStrength = options.fold ?? 0;
+      const foldMask = Math.pow(Math.max(0, Math.sin(Math.PI * v)), 0.82) * THREE.MathUtils.smoothstep(v, 0.04, 0.42);
+      const midribCrease = (1 - Math.pow(Math.abs(u), 0.72)) * foldMask * options.length;
+      const longitudinalFold = midribCrease * (open
+        ? foldStrength * 0.12
+        : 0.045 + Math.max(0, foldStrength) * 0.025);
       const tipCurl = Math.pow(v, 3.2) * options.curl * options.length * 0.38;
       const closedFold = -Math.pow(v, 2.3) * options.length * (0.16 + Math.max(0, options.curl) * 0.1);
       const basalBand = Math.exp(-Math.pow((v - 0.16) / 0.14, 2)) * (1 - u * u);
       const basalBulge = growthProfile.basalEpinasty * options.length * 0.058 * basalBand;
       const z = open
-        ? transverseCup + tipCurl + wave + midrib + basalBulge
-        : closedFold + transverseCup * 0.42 + wave;
+        ? transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge
+        : closedFold + transverseCup * 0.42 + longitudinalFold + wave;
 
       positions[ptr++] = x;
       positions[ptr++] = y;
@@ -236,6 +243,7 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.userData.petalThickness = thickness;
   geometry.userData.closedPetalLength = options.growth?.closedPetalLength ?? DEFAULT_GROWTH_PROFILE.closedPetalLength;
   geometry.userData.closedPetalWidth = options.growth?.closedPetalWidth ?? DEFAULT_GROWTH_PROFILE.closedPetalWidth;
+  geometry.userData.petalFold = options.fold ?? 0;
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

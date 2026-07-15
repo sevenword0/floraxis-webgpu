@@ -107,4 +107,32 @@ describe('petal geometry', () => {
     expect(geometry.userData.closedPetalLength).toBe(0.66);
     geometry.dispose();
   });
+
+  it('adds a controllable longitudinal midrib fold to the open petal', () => {
+    const makeGeometry = (fold: number) => createPetalGeometry({
+      length: 1.2,
+      width: 0.7,
+      shape: 'round',
+      taper: 0.4,
+      notch: 0,
+      waviness: 0,
+      cup: 0,
+      curl: 0,
+      fold,
+      seed: 13,
+      colors: { base: '#8d1836', tip: '#f38192' },
+    });
+    const flat = makeGeometry(0);
+    const folded = makeGeometry(0.8);
+    const rowStart = 9 * 11;
+    const flatOpen = flat.morphAttributes.position![0];
+    const foldedOpen = folded.morphAttributes.position![0];
+    const flatCrease = flatOpen.getZ(rowStart + 5) - flatOpen.getZ(rowStart + 1);
+    const foldedCrease = foldedOpen.getZ(rowStart + 5) - foldedOpen.getZ(rowStart + 1);
+
+    expect(foldedCrease).toBeGreaterThan(flatCrease + 0.05);
+    expect(folded.userData.petalFold).toBe(0.8);
+    flat.dispose();
+    folded.dispose();
+  });
 });
