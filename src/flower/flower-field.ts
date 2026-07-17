@@ -8,6 +8,7 @@ import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
 import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
 import { createLeafGeometry } from './leaf-geometry';
+import { LeafAttachmentFrame, setLeafGrowthDirection } from './leaf-attachment';
 import { FieldTerrain } from './field-terrain';
 import { sampleWindBend } from './field-environment-layout';
 import { generateInflorescencePetalSpecs, type InflorescencePetalSpec } from './inflorescence-layout';
@@ -218,6 +219,7 @@ export class FlowerField implements Bloomable {
   private readonly headQuaternion = new THREE.Quaternion();
   private readonly tiltQuaternion = new THREE.Quaternion();
   private readonly yawQuaternion = new THREE.Quaternion();
+  private readonly leafAttachmentFrame = new LeafAttachmentFrame();
   private readonly right = new THREE.Vector3(1, 0, 0);
   private readonly forward = new THREE.Vector3(0, 0, 1);
   private readonly outward = new THREE.Vector3();
@@ -753,6 +755,8 @@ export class FlowerField implements Bloomable {
       const widthWorld = botanicalLengthToWorld(architecture.leafWidthCm) * plant.leafScale;
       let tilt = -0.58;
       let ratio = 0.24 + leafNode / Math.max(1, leafNodeCount - 1) * 0.5;
+      let petioleLength = Math.max(0.025, Math.min(0.16, widthWorld * 0.52));
+      let separatePetiole = false;
 
       if (architecture.leafArrangement === 'basal') {
         ratio = 0.06 + slot / Math.max(1, count) * 0.12;
@@ -766,6 +770,7 @@ export class FlowerField implements Bloomable {
       }
 
       if (architecture.leafArrangement === 'separate-petiole') {
+        separatePetiole = true;
         const reach = plant.visualHeight * (0.18 + slot * 0.055);
         this.stemStart.set(plant.x, plant.groundY, plant.z);
         this.stemEnd.set(
@@ -797,20 +802,13 @@ export class FlowerField implements Bloomable {
           branchBaseY + Math.cos(branchAngle) * branchLength,
           branchBaseZ + Math.cos(angle) * Math.sin(branchAngle) * branchLength,
         );
-        const petiole = Math.max(0.025, Math.min(0.18, widthWorld * 0.58));
-        this.stemEnd.set(
-          this.stemStart.x + Math.sin(angle) * petiole,
-          this.stemStart.y + petiole * 0.2,
-          this.stemStart.z + Math.cos(angle) * petiole,
-        );
+        petioleLength = Math.max(0.025, Math.min(0.18, widthWorld * 0.58));
+        setLeafGrowthDirection(angle, -tilt, this.outward);
+        this.stemEnd.copy(this.stemStart).addScaledVector(this.outward, petioleLength);
       } else {
         this.sampleCurrentStemCurve(ratio, this.stemStart);
-        const petiole = Math.max(0.025, Math.min(0.16, widthWorld * 0.52));
-        this.stemEnd.set(
-          this.stemStart.x + Math.sin(angle) * petiole,
-          this.stemStart.y + petiole * 0.18,
-          this.stemStart.z + Math.cos(angle) * petiole,
-        );
+        setLeafGrowthDirection(angle, -tilt, this.outward);
+        this.stemEnd.copy(this.stemStart).addScaledVector(this.outward, petioleLength);
       }
 
       const leafWind = sampleWindBend(
@@ -824,16 +822,34 @@ export class FlowerField implements Bloomable {
       const leafFlutter = Math.sin(time * 0.0032 + plant.windPhase * 1.7 + slot * 1.13)
         * this.settings.wind
         * (0.035 + (this.settings.windTurbulence ?? 0.58) * 0.085);
-      this.stemEnd.x += leafWind.x * lengthWorld * 0.09;
-      this.stemEnd.z += leafWind.z * lengthWorld * 0.09;
+      if (separatePetiole) {
+        this.stemEnd.x += leafWind.x * lengthWorld * 0.09;
+        this.stemEnd.z += leafWind.z * lengthWorld * 0.09;
+      } else {
+        const elevation = -(tilt + leafWind.z * 0.12 + leafFlutter);
+        setLeafGrowthDirection(angle + leafWind.x * 0.075, elevation, this.outward);
+        this.stemEnd.copy(this.stemStart).addScaledVector(this.outward, petioleLength);
+      }
       this.setCylinderBetween(batch.leafStemMesh!, index, this.stemStart, this.stemEnd, this.stemRadius(batch, plant) * 0.22);
       this.transform.position.copy(this.stemEnd);
-      this.transform.rotation.set(
-        tilt + leafWind.z * 0.12 + leafFlutter,
-        angle,
-        Math.sin(slot * 2.47) * 0.08 - leafWind.x * 0.2 + leafFlutter * 0.62,
-        'YXZ',
-      );
+      const roll = Math.sin(slot * 2.47) * 0.08 - leafWind.x * 0.2 + leafFlutter * 0.62;
+      if (architecture.leafShape === 'peltate-orbicular') {
+        this.leafAttachmentFrame.setPeltateQuaternion(
+          this.stemStart,
+          this.stemEnd,
+          angle,
+          roll,
+          this.transform.quaternion,
+        );
+      } else {
+        this.leafAttachmentFrame.setBladeQuaternion(
+          this.stemStart,
+          this.stemEnd,
+          this.up,
+          roll,
+          this.transform.quaternion,
+        );
+      }
       this.transform.scale.set(Math.max(0.025, widthWorld), 1, Math.max(0.04, lengthWorld));
       this.transform.updateMatrix();
       batch.leafMesh!.setMatrixAt(index, this.transform.matrix);

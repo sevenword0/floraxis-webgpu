@@ -9,6 +9,7 @@ import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
 import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
 import { createLeafGeometry } from './leaf-geometry';
+import { LeafAttachmentFrame, setLeafGrowthDirection } from './leaf-attachment';
 import {
   generateInflorescencePetalSpecs,
   type InflorescencePetalSpec,
@@ -102,6 +103,8 @@ export class FlowerModel implements Bloomable {
   private readonly dummy = new THREE.Object3D();
   private readonly stemCurve: THREE.CubicBezierCurve3;
   private readonly stemTip = new THREE.Vector3();
+  private readonly leafAttachmentFrame = new LeafAttachmentFrame();
+  private readonly worldUp = new THREE.Vector3(0, 1, 0);
   private lastProgress = -1;
   private readonly headBaseTilt: number;
   private readonly headBaseYaw: number;
@@ -174,6 +177,42 @@ export class FlowerModel implements Bloomable {
     stem.receiveShadow = true;
     this.root.add(stem);
 
+    const segmentGeometry = this.track(new THREE.CylinderGeometry(1, 1, 1, 8, 2));
+    segmentGeometry.translate(0, 0.5, 0);
+    const placeSegment = (
+      mesh: THREE.Mesh,
+      start: THREE.Vector3,
+      end: THREE.Vector3,
+      radius: number,
+    ): void => {
+      const direction = end.clone().sub(start);
+      const length = Math.max(0.001, direction.length());
+      mesh.position.copy(start);
+      mesh.quaternion.setFromUnitVectors(this.worldUp, direction.normalize());
+      mesh.scale.set(radius, length, radius);
+    };
+
+    const branchCount = Math.min(8, Math.max(0, architecture.branchCount));
+    const branchLength = m.stemHeight * (architecture.stemHabit === 'woody-branch' ? 0.32 : architecture.stemHabit === 'shrub' ? 0.22 : 0.13);
+    const branchSegments = Array.from({ length: branchCount }, (_, index) => {
+      const ratio = 0.28 + (index + 1) / (architecture.branchCount + 1) * 0.48;
+      const angle = index * GOLDEN_ANGLE + 0.7;
+      const inclination = architecture.branchAngleDeg * DEG;
+      const start = this.stemCurve.getPointAt(ratio);
+      const end = start.clone().add(new THREE.Vector3(
+        Math.sin(angle) * Math.sin(inclination) * branchLength,
+        Math.cos(inclination) * branchLength,
+        Math.cos(angle) * Math.sin(inclination) * branchLength,
+      ));
+      const branch = new THREE.Mesh(segmentGeometry, stemMaterial);
+      branch.name = `branch-${index}`;
+      placeSegment(branch, start, end, stemRadius * 0.46);
+      branch.castShadow = true;
+      branch.receiveShadow = true;
+      this.root.add(branch);
+      return { angle, start, end };
+    });
+
     const leafMaterial = this.track(new THREE.MeshSSSNodeMaterial({ color: this.preset.colors.stem, roughness: 0.8, side: THREE.DoubleSide }));
     leafMaterial.thicknessColorNode = color('#9ccf80');
     leafMaterial.thicknessAttenuationNode = float(0.38);
@@ -197,40 +236,51 @@ export class FlowerModel implements Bloomable {
         : separate ? m.stemHeight * (0.34 + fraction * 0.2)
           : clustered ? m.stemHeight * (0.6 + fraction * 0.25)
             : m.stemHeight * (0.2 + fraction * 0.58);
-      const angle = opposite
+      let angle = opposite
         ? nodeIndex * GOLDEN_ANGLE + (index % 2) * Math.PI + 0.7
         : index * GOLDEN_ANGLE + 0.7;
-      const radial = new THREE.Group();
-      if (separate) {
-        radial.position.set(Math.sin(angle) * m.stemHeight * 0.18, y, Math.cos(angle) * m.stemHeight * 0.18);
-      } else {
-        this.stemCurve.getPointAt(THREE.MathUtils.clamp(y / m.stemHeight, 0, 1), radial.position);
+      const petioleBase = new THREE.Vector3();
+      const petioleTip = new THREE.Vector3();
+      const branchSegment = clustered && branchSegments.length > 0
+        ? branchSegments[index % branchSegments.length]
+        : undefined;
+      if (branchSegment) {
+        angle = branchSegment.angle;
+        petioleBase.copy(branchSegment.end);
+      } else if (!separate) {
+        this.stemCurve.getPointAt(THREE.MathUtils.clamp(y / m.stemHeight, 0, 1), petioleBase);
       }
-      radial.rotation.y = angle;
-      radial.rotation.x = separate ? 0.03 : basal ? -1.02 : clustered ? -0.62 : architecture.leafArrangement === 'whorled' ? -0.48 : -0.58;
-      radial.rotation.z = Math.sin(index * 2.1) * 0.12;
+
+      const tilt = separate ? 0.03 : basal ? -1.02 : clustered ? -0.62 : architecture.leafArrangement === 'whorled' ? -0.48 : -0.58;
+      if (separate) {
+        petioleTip.set(Math.sin(angle) * m.stemHeight * 0.18, y, Math.cos(angle) * m.stemHeight * 0.18);
+      } else {
+        const petioleLength = THREE.MathUtils.clamp(leafWidth * 0.32, 0.055, 0.34);
+        setLeafGrowthDirection(angle, -tilt, petioleTip);
+        petioleTip.multiplyScalar(petioleLength).add(petioleBase);
+      }
+
+      const petiole = new THREE.Mesh(segmentGeometry, stemMaterial);
+      petiole.name = `leaf-petiole-${index}`;
+      placeSegment(petiole, petioleBase, petioleTip, stemRadius * 0.22);
+      petiole.castShadow = true;
+      petiole.receiveShadow = true;
+      this.root.add(petiole);
+
       const mesh = new THREE.Mesh(leafGeometry, leafMaterial);
+      mesh.name = `leaf-blade-${index}`;
+      mesh.position.copy(petioleTip);
+      const roll = Math.sin(index * 2.1) * 0.12;
+      if (architecture.leafShape === 'peltate-orbicular') {
+        this.leafAttachmentFrame.setPeltateQuaternion(petioleBase, petioleTip, angle, roll, mesh.quaternion);
+      } else {
+        this.leafAttachmentFrame.setBladeQuaternion(petioleBase, petioleTip, this.worldUp, roll, mesh.quaternion);
+      }
       mesh.scale.set(leafWidth, 1, leafLength);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      radial.add(mesh);
-      this.root.add(radial);
+      this.root.add(mesh);
     });
-
-    if (architecture.branchCount > 0) {
-      const branchLength = m.stemHeight * (architecture.stemHabit === 'woody-branch' ? 0.32 : architecture.stemHabit === 'shrub' ? 0.22 : 0.13);
-      for (let index = 0; index < Math.min(8, architecture.branchCount); index += 1) {
-        const branchGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.34, stemRadius * 0.52, branchLength, 8, 2));
-        branchGeometry.translate(0, branchLength * 0.5, 0);
-        const branch = new THREE.Mesh(branchGeometry, stemMaterial);
-        const branchRatio = 0.28 + (index + 1) / (architecture.branchCount + 1) * 0.48;
-        this.stemCurve.getPointAt(branchRatio, branch.position);
-        branch.rotation.y = index * GOLDEN_ANGLE;
-        branch.rotation.z = architecture.branchAngleDeg * DEG;
-        branch.castShadow = true;
-        this.root.add(branch);
-      }
-    }
     if (this.preset.kind === 'wisteria') {
       const hangerLength = WISTERIA_HANGER_LENGTH;
       const hangerGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.48, stemRadius * 0.62, hangerLength, 10, 2));

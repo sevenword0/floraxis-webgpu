@@ -59,26 +59,28 @@ const bladeWidth = (shape: Exclude<LeafShape, 'compound-pinnate' | 'peltate-orbi
 
 const createBladeData = (shape: Exclude<LeafShape, 'compound-pinnate' | 'peltate-orbicular'>): MutableGeometryData => {
   const data: MutableGeometryData = { positions: [], uvs: [], indices: [] };
-  const segments = 18;
-  for (let row = 0; row <= segments; row += 1) {
-    const t = row / segments;
+  const lengthSegments = 24;
+  const widthSegments = 8;
+  for (let row = 0; row <= lengthSegments; row += 1) {
+    const t = row / lengthSegments;
     const width = bladeWidth(shape, t);
     const camber = Math.sin(Math.PI * t) * (shape === 'broad-lanceolate' ? 0.045 : 0.03);
-    data.positions.push(
-      -width, camber - width * 0.035, t,
-      0, camber, t,
-      width, camber + width * 0.035, t,
-    );
-    data.uvs.push(0, t, 0.5, t, 1, t);
-    if (row < segments) {
-      const a = row * 3;
-      const b = a + 3;
-      data.indices.push(
-        a, a + 1, b,
-        a + 1, b + 1, b,
-        a + 1, a + 2, b + 1,
-        a + 2, b + 2, b + 1,
-      );
+    for (let column = 0; column <= widthSegments; column += 1) {
+      const u = column / widthSegments;
+      const lateral = u * 2 - 1;
+      data.positions.push(lateral * width, camber + lateral * width * 0.035, t);
+      data.uvs.push(u, t);
+    }
+    if (row < lengthSegments) {
+      const rowStride = widthSegments + 1;
+      const a = row * rowStride;
+      const b = a + rowStride;
+      for (let column = 0; column < widthSegments; column += 1) {
+        data.indices.push(
+          a + column, a + column + 1, b + column,
+          a + column + 1, b + column + 1, b + column,
+        );
+      }
     }
   }
   return data;
@@ -86,16 +88,37 @@ const createBladeData = (shape: Exclude<LeafShape, 'compound-pinnate' | 'peltate
 
 const createPeltateData = (): MutableGeometryData => {
   const data: MutableGeometryData = { positions: [], uvs: [], indices: [] };
-  const segments = 40;
-  const center = 0;
+  const angleSegments = 40;
+  const radialSegments = 7;
   data.positions.push(0, 0.025, 0);
   data.uvs.push(0.5, 0.5);
-  for (let index = 0; index <= segments; index += 1) {
-    const angle = index / segments * Math.PI * 2;
-    const ripple = 0.49 + Math.sin(angle * 9) * 0.015;
-    data.positions.push(Math.cos(angle) * ripple, Math.cos(angle * 2) * 0.016, Math.sin(angle) * ripple);
-    data.uvs.push(Math.cos(angle) * 0.5 + 0.5, Math.sin(angle) * 0.5 + 0.5);
-    if (index > 0) data.indices.push(center, index, index + 1);
+  for (let ring = 1; ring <= radialSegments; ring += 1) {
+    const radial = ring / radialSegments;
+    for (let index = 0; index <= angleSegments; index += 1) {
+      const angle = index / angleSegments * Math.PI * 2;
+      const edgeRipple = Math.sin(angle * 9) * 0.015 * Math.pow(radial, 3);
+      const radius = radial * 0.49 + edgeRipple;
+      data.positions.push(
+        Math.cos(angle) * radius,
+        Math.cos(angle * 2) * 0.016 * radial * radial,
+        Math.sin(angle) * radius,
+      );
+      data.uvs.push(Math.cos(angle) * radius + 0.5, Math.sin(angle) * radius + 0.5);
+    }
+  }
+  for (let index = 0; index < angleSegments; index += 1) {
+    data.indices.push(0, 1 + index, 1 + index + 1);
+  }
+  const ringStride = angleSegments + 1;
+  for (let ring = 1; ring < radialSegments; ring += 1) {
+    const inner = 1 + (ring - 1) * ringStride;
+    const outer = inner + ringStride;
+    for (let index = 0; index < angleSegments; index += 1) {
+      data.indices.push(
+        inner + index, outer + index, inner + index + 1,
+        inner + index + 1, outer + index, outer + index + 1,
+      );
+    }
   }
   return data;
 };
