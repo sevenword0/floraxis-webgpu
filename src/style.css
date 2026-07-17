@@ -128,6 +128,10 @@ input[type="range"]::-moz-range-thumb { width: 8px; height: 8px; border: 2px sol
 .custom-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .custom-actions button { border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); padding: 8px 4px; color: #aebdb5; font-size: 8px; cursor: pointer; }
 .custom-actions button:hover { border-color: var(--accent); color: #fff; }
+.field-layout-select { display: block; margin-bottom: 8px; color: #899a92; font-size: 9px; }
+.field-layout-select span { display: block; margin-bottom: 7px; }
+.field-layout-select select { width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px; background: #111c18; color: #d4e0da; font-size: 9px; }
+.field-layout-note { min-height: 25px; margin: 0 0 12px; color: #72877d; font-size: 8px; line-height: 1.55; word-break: keep-all; }
 .field-label { display: block; margin: 2px 0 8px; color: #899a92; font-size: 9px; }
 .species-mix { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
 .species-chip { min-height: 33px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 7px; display: flex; align-items: center; gap: 7px; color: #81938a; background: rgba(255,255,255,.018); cursor: pointer; font-size: 8px; }

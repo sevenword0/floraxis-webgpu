@@ -9,6 +9,7 @@ import {
   parseIndividualFlowerExport,
 } from './flower-field-layout';
 import { sampleTerrainHeight } from './field-environment-layout';
+import { generateFieldLayoutAnchors } from './field-layout-patterns';
 
 const settings: FieldSettings = {
   count: 48,
@@ -18,6 +19,10 @@ const settings: FieldSettings = {
   bloomVariance: 0.35,
   wind: 0.4,
   windTurbulence: 0.58,
+  layoutMode: 'scatter',
+  mixStrength: 1,
+  rowsPerSpecies: 2,
+  ringCount: 6,
   groundCover: 0.82,
   shrubDensity: 0.62,
   rockDensity: 0.38,
@@ -70,6 +75,45 @@ describe('preset flower-field layout', () => {
     for (let a = 0; a < defaultField.length; a += 1) {
       for (let b = a + 1; b < defaultField.length; b += 1) {
         expect(flowersOverlapAtFullBloom(defaultField[a], defaultField[b])).toBe(false);
+      }
+    }
+  });
+
+  it('keeps organised species groups at zero mixing and randomises only species at full mixing', () => {
+    const modes = ['scatter', 'species-rows', 'concentric', 'species-sectors', 'radial-composite'] as const;
+    const speciesPresets = PRESETS.slice(0, 3);
+    for (const layoutMode of modes) {
+      const layoutSettings = { ...settings, layoutMode, mixStrength: 0, count: 72, radius: 7 };
+      const anchors = generateFieldLayoutAnchors(layoutSettings, speciesPresets.length);
+      const grouped = generateFieldLayout(layoutSettings, speciesPresets);
+      expect(grouped.map((plant) => plant.presetId)).toEqual(
+        anchors.map((anchor) => speciesPresets[anchor.groupIndex].id),
+      );
+
+      const mixed = generateFieldLayout({ ...layoutSettings, mixStrength: 1 }, speciesPresets);
+      const changed = mixed.filter((plant, index) => plant.presetId !== grouped[index].presetId).length;
+      expect(changed).toBeGreaterThan(grouped.length * 0.4);
+      expect(new Set(mixed.map((plant) => plant.presetId))).toEqual(new Set(speciesPresets.map((preset) => preset.id)));
+    }
+  });
+
+  it('keeps mature crowns separate in every structured layout', () => {
+    const modes = ['species-rows', 'concentric', 'species-sectors', 'radial-composite'] as const;
+    for (const layoutMode of modes) {
+      const plants = generateFieldLayout({
+        ...settings,
+        layoutMode,
+        mixStrength: 0,
+        count: 120,
+        radius: 6.5,
+        spacing: 0.52,
+        wind: 0.36,
+        speciesIds: PRESETS.map((preset) => preset.id),
+      }, PRESETS);
+      for (let a = 0; a < plants.length; a += 1) {
+        for (let b = a + 1; b < plants.length; b += 1) {
+          expect(flowersOverlapAtFullBloom(plants[a], plants[b])).toBe(false);
+        }
       }
     }
   });

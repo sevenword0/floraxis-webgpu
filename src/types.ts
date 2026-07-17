@@ -180,6 +180,8 @@ export interface RenderSettings {
 
 export type SceneMode = 'specimen' | 'field';
 
+export type FieldLayoutMode = 'scatter' | 'species-rows' | 'concentric' | 'species-sectors' | 'radial-composite';
+
 /** Overrides attached to one deterministic field index. Values use botanical units. */
 export interface IndividualFlowerSettings {
   presetId?: string;
@@ -209,6 +211,14 @@ export interface FieldSettings {
   wind: number;
   /** High-frequency wind variation layered over the coherent field direction. */
   windTurbulence: number;
+  /** Geometric planting pattern used before mature-crown collision relaxation. */
+  layoutMode: FieldLayoutMode;
+  /** Probability that an organised species group is replaced by a seeded random species. */
+  mixStrength: number;
+  /** Number of parallel planting rows allocated to each enabled species. */
+  rowsPerSpecies: number;
+  /** Number of bands used by concentric and composite layouts. */
+  ringCount: number;
   /** Density of grass-like ground cover. */
   groundCover: number;
   /** Density of low broadleaf understory clumps. */

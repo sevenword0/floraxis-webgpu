@@ -2,6 +2,7 @@ import type { FieldSettings, FlowerPreset, IndividualFlowerSettings } from '../t
 import { resolveBotanicalArchitecture, sanitizeIndividualFlowerSettings } from '../data/botanical-architecture';
 import { clamp01, seededRandom } from '../utils';
 import { sampleTerrainHeight } from './field-environment-layout';
+import { generateFieldLayoutAnchors, type FieldLayoutAnchor } from './field-layout-patterns';
 
 export type FieldLod = 'near' | 'mid' | 'far';
 
@@ -48,6 +49,37 @@ const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const normalizedSpecies = (speciesIds: string[]): string[] => {
   const unique = Array.from(new Set(speciesIds.filter(Boolean)));
   return unique.length > 0 ? unique : ['rose'];
+};
+
+const assignSpeciesToAnchors = (
+  anchors: FieldLayoutAnchor[],
+  species: string[],
+  mixStrength: number,
+  seed: number,
+): string[] => {
+  const random = seededRandom(Math.imul(seed, 0x85ebca6b) ^ 0xc2b2ae35);
+  const mixing = clamp01(mixStrength);
+  const assignments = anchors.map((anchor) => {
+    const grouped = species[anchor.groupIndex % species.length];
+    return random() < mixing ? species[Math.floor(random() * species.length)] : grouped;
+  });
+
+  // A seeded random mix can statistically omit a selected species. Keep every
+  // enabled preset represented while preserving overrides and group balance.
+  const counts = new Map(species.map((id) => [id, 0]));
+  assignments.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
+  species.forEach((missingId, missingIndex) => {
+    if ((counts.get(missingId) ?? 0) > 0) return;
+    let replacement = assignments.findIndex((current, index) =>
+      anchors[index].groupIndex % species.length === missingIndex && (counts.get(current) ?? 0) > 1);
+    if (replacement < 0) replacement = assignments.findIndex((current) => (counts.get(current) ?? 0) > 1);
+    if (replacement < 0) return;
+    const previous = assignments[replacement];
+    assignments[replacement] = missingId;
+    counts.set(previous, (counts.get(previous) ?? 1) - 1);
+    counts.set(missingId, 1);
+  });
+  return assignments;
 };
 
 const distanceSquared = (a: Pick<FieldPlant, 'x' | 'z'>, b: Pick<FieldPlant, 'x' | 'z'>): number => {
@@ -209,9 +241,9 @@ const relaxMatureCrowns = (
 };
 
 /**
- * Creates a deterministic, blue-noise-like circular layout. Placement tests
- * the full-anthesis three-dimensional crown spheres, not only stem centres, so
- * flowers that expand at similar heights reserve enough room before opening.
+ * Creates a deterministic scatter, row, ring, sector, or composite layout.
+ * Placement tests the full-anthesis three-dimensional crown spheres, not only
+ * stem centres, so flowers that expand at similar heights reserve enough room.
  */
 export const generateFieldLayout = (
   settings: FieldSettings,
@@ -223,29 +255,43 @@ export const generateFieldLayout = (
   const presetById = new Map(presets.map((preset) => [preset.id, preset]));
   const requested = normalizedSpecies(settings.speciesIds).filter((id) => presetById.has(id));
   const species = requested.length > 0 ? requested : presets.map((preset) => preset.id);
-  const random = seededRandom(Math.max(1, Math.round(settings.seed)) * 2654435761);
+  const seed = Math.max(1, Math.round(settings.seed));
+  const random = seededRandom(Math.imul(seed, 0x9e3779b1) ^ 0x243f6a88);
+  const anchors = generateFieldLayoutAnchors(settings, species.length);
+  const assignments = assignSpeciesToAnchors(anchors, species, settings.mixStrength, seed);
   const plants: FieldPlant[] = [];
 
   for (let index = 0; index < count; index += 1) {
     const rawOverride = settings.individuals?.[String(index)];
-    const assignedPresetId = index < species.length
-      ? species[index]
-      : species[Math.floor(random() * species.length)];
+    const assignedPresetId = assignments[index] ?? species[index % species.length];
     const presetId = rawOverride?.presetId && presetById.has(rawOverride.presetId)
       ? rawOverride.presetId
       : assignedPresetId;
     const preset = presetById.get(presetId) ?? presets[0];
     const values = resolvePlantValues(index, preset, rawOverride, random, settings.wind);
-    let x = 0;
-    let z = 0;
+    const anchor = anchors[index];
+    const placementRandom = seededRandom(Math.imul(seed ^ (index + 1), 0x27d4eb2d) ^ 0x165667b1);
+    const usableRadius = Math.max(0.08, radius - spacing * 0.42);
+    let x = anchor.x;
+    let z = anchor.z;
     let accepted = false;
 
     for (let attempt = 0; attempt < 72; attempt += 1) {
-      const usableRadius = Math.max(0.08, radius - spacing * 0.42);
-      const candidateRadius = Math.sqrt(random()) * usableRadius;
-      const angle = random() * TAU;
-      x = Math.cos(angle) * candidateRadius;
-      z = Math.sin(angle) * candidateRadius;
+      if (attempt === 0) {
+        x = anchor.x;
+        z = anchor.z;
+      } else {
+        const jitterLimit = spacing * (settings.layoutMode === 'scatter' ? 1.45 : 0.92);
+        const jitterRadius = jitterLimit * Math.sqrt(attempt / 71) * (0.82 + placementRandom() * 0.18);
+        const angle = index * GOLDEN_ANGLE + attempt * GOLDEN_ANGLE + placementRandom() * 0.24;
+        x = anchor.x + Math.cos(angle) * jitterRadius;
+        z = anchor.z + Math.sin(angle) * jitterRadius;
+        const radial = Math.hypot(x, z);
+        if (radial > usableRadius) {
+          x *= usableRadius / radial;
+          z *= usableRadius / radial;
+        }
+      }
       const candidate = {
         ...values,
         index,
@@ -266,11 +312,8 @@ export const generateFieldLayout = (
     }
 
     if (!accepted) {
-      const normalized = Math.sqrt((index + 0.5) / count);
-      const fallbackRadius = normalized * Math.max(0.08, radius - spacing * 0.32);
-      const angle = index * GOLDEN_ANGLE + random() * 0.2;
-      x = Math.cos(angle) * fallbackRadius;
-      z = Math.sin(angle) * fallbackRadius;
+      x = anchor.x;
+      z = anchor.z;
     }
 
     const radial = Math.hypot(x, z) / radius;

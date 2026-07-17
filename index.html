@@ -85,6 +85,25 @@
                   <span>꽃 개체 수 <output data-field-output="count">120</output></span>
                   <input type="range" min="24" max="320" step="8" data-field="count" />
                 </label>
+                <label class="field-layout-select" for="field-layout">
+                  <span>꽃밭 배치 유형</span>
+                  <select id="field-layout">
+                    <option value="scatter">자유 산포</option>
+                    <option value="species-rows">종별 줄</option>
+                    <option value="concentric">동심원</option>
+                    <option value="species-sectors">종별 부채꼴</option>
+                    <option value="radial-composite">중심원 · 부채 · 외곽원</option>
+                  </select>
+                </label>
+                <p class="field-layout-note" id="field-layout-note"></p>
+                <label class="range-field">
+                  <span>랜덤 혼합 강도 <output data-field-output="mixStrength">100%</output></span>
+                  <input type="range" min="0" max="1" step="0.01" data-field="mixStrength" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>종별 줄 수 <output data-field-output="rowsPerSpecies">2줄/종</output></span><input type="range" min="1" max="6" step="1" data-field="rowsPerSpecies" /></label>
+                  <label class="range-field"><span>동심원 수 <output data-field-output="ringCount">6겹</output></span><input type="range" min="2" max="12" step="1" data-field="ringCount" /></label>
+                </div>
                 <div class="split-fields">
                   <label class="range-field"><span>꽃밭 반경 <output data-field-output="radius">6.5m</output></span><input type="range" min="3" max="9" step="0.25" data-field="radius" /></label>
                   <label class="range-field"><span>최소 간격 <output data-field-output="spacing">0.52m</output></span><input type="range" min="0.18" max="0.9" step="0.01" data-field="spacing" /></label>

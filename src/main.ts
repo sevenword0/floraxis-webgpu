@@ -18,6 +18,7 @@ import { BloomRenderer } from './render/bloom-renderer';
 import type {
   AppState,
   BloomGrowthProfile,
+  FieldLayoutMode,
   FieldSettings,
   FlowerPreset,
   IndividualFlowerSettings,
@@ -77,6 +78,10 @@ const DEFAULT_FIELD: FieldSettings = {
   bloomVariance: 0.32,
   wind: 0.36,
   windTurbulence: 0.58,
+  layoutMode: 'scatter',
+  mixStrength: 1,
+  rowsPerSpecies: 2,
+  ringCount: 6,
   groundCover: 0.88,
   shrubDensity: 0.76,
   rockDensity: 0.42,
@@ -127,6 +132,9 @@ type FieldNumericKey =
   | 'bloomVariance'
   | 'wind'
   | 'windTurbulence'
+  | 'mixStrength'
+  | 'rowsPerSpecies'
+  | 'ringCount'
   | 'groundCover'
   | 'shrubDensity'
   | 'rockDensity'
@@ -145,6 +153,14 @@ type RenderNumericKey =
   | 'bokehRotation'
   | 'bokehGamma'
   | 'defocusGamma';
+
+const FIELD_LAYOUT_NOTES: Record<FieldLayoutMode, string> = {
+  scatter: '위치는 자연스럽게 흩뿌립니다. 혼합 0%에서는 종별 구역을 유지하고, 100%에서는 종을 완전히 섞습니다.',
+  'species-rows': '활성화한 각 종마다 지정한 수의 평행 줄을 만듭니다. 혼합 강도로 줄 사이의 종 교환량을 조절합니다.',
+  concentric: '지정한 수의 원형 식재 띠를 만듭니다. 혼합 0%에서는 각 원 안의 종별 구간이 유지됩니다.',
+  'species-sectors': '각 종을 하나의 부채꼴 구역에 모아 방사형 군락을 만듭니다.',
+  'radial-composite': '중심 원형 군락, 종별 중간 부채꼴, 외곽 동심원 띠를 하나의 꽃밭으로 결합합니다.',
+};
 
 try {
   const stored = localStorage.getItem('floraxis:custom-preset');
@@ -244,9 +260,15 @@ const updateFieldUI = (): void => {
     updateRangeVisual(input);
     const output = qs<HTMLOutputElement>(`[data-field-output="${key}"]`);
     if (key === 'count') output.value = String(Math.round(value));
+    else if (key === 'rowsPerSpecies') output.value = `${Math.round(value)}줄/종`;
+    else if (key === 'ringCount') output.value = `${Math.round(value)}겹`;
     else if (key === 'radius' || key === 'spacing') output.value = `${Number(value.toFixed(2))}m`;
     else output.value = `${Math.round(value * 100)}%`;
   });
+  qs<HTMLSelectElement>('#field-layout').value = state.field.layoutMode;
+  qs<HTMLElement>('#field-layout-note').textContent = FIELD_LAYOUT_NOTES[state.field.layoutMode];
+  qs<HTMLInputElement>('[data-field="rowsPerSpecies"]').disabled = state.field.layoutMode !== 'species-rows';
+  qs<HTMLInputElement>('[data-field="ringCount"]').disabled = !['concentric', 'radial-composite'].includes(state.field.layoutMode);
   qs<HTMLInputElement>('#field-seed').value = String(state.field.seed);
   qsa<HTMLInputElement>('#field-species input').forEach((input) => {
     input.checked = state.field.speciesIds.includes(input.value);
@@ -728,11 +750,19 @@ const wireEvents = (): void => {
   qsa<HTMLInputElement>('[data-field]').forEach((input) => {
     input.addEventListener('input', () => {
       const key = input.dataset.field as FieldNumericKey;
-      const nextValue = key === 'count' ? Math.round(Number(input.value)) : Number(input.value);
+      const nextValue = ['count', 'rowsPerSpecies', 'ringCount'].includes(key)
+        ? Math.round(Number(input.value))
+        : Number(input.value);
       (state.field as unknown as Record<string, number>)[key] = nextValue;
       updateFieldUI();
       scheduleFieldRebuild(key === 'radius');
     });
+  });
+  qs<HTMLSelectElement>('#field-layout').addEventListener('change', (event) => {
+    state.field.layoutMode = (event.currentTarget as HTMLSelectElement).value as FieldLayoutMode;
+    updateFieldUI();
+    scheduleFieldRebuild();
+    showToast(`꽃밭 배치를 '${(event.currentTarget as HTMLSelectElement).selectedOptions[0].text}' 방식으로 바꿨습니다.`);
   });
   qs<HTMLInputElement>('#field-seed').addEventListener('change', (event) => {
     const input = event.currentTarget as HTMLInputElement;
