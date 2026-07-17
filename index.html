@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0d1513" />
     <meta name="description" content="WebGPU 기반 실시간 꽃 개화 시뮬레이터. 장미, 튤립, 백합, 벚꽃, 연꽃, 해바라기를 관찰하고 나만의 꽃을 설계하세요." />
     <title>Floraxis — WebGPU 개화 시뮬레이터</title>
-    <script type="module" crossorigin src="./assets/index-Bsa7X2P4.js"></script>
+    <script type="module" crossorigin src="./assets/index-B0xpv0Zl.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-Sx0vuLfp.css">
   </head>
   <body>
@@ -95,10 +95,21 @@
                   <label class="range-field"><span>개화 파동 <output data-field-output="bloomWave">64%</output></span><input type="range" min="0" max="1" step="0.01" data-field="bloomWave" /></label>
                   <label class="range-field"><span>개화 편차 <output data-field-output="bloomVariance">32%</output></span><input type="range" min="0" max="1" step="0.01" data-field="bloomVariance" /></label>
                 </div>
-                <label class="range-field">
-                  <span>바람 세기 <output data-field-output="wind">36%</output></span>
-                  <input type="range" min="0" max="1" step="0.01" data-field="wind" />
-                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>바람 세기 <output data-field-output="wind">36%</output></span><input type="range" min="0" max="1" step="0.01" data-field="wind" /></label>
+                  <label class="range-field"><span>바람 난류 <output data-field-output="windTurbulence">58%</output></span><input type="range" min="0" max="1" step="0.01" data-field="windTurbulence" /></label>
+                </div>
+                <div>
+                  <span class="field-label">지표 생태층</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>잔풀·지피 <output data-field-output="groundCover">88%</output></span><input type="range" min="0" max="1" step="0.01" data-field="groundCover" /></label>
+                    <label class="range-field"><span>수풀 밀도 <output data-field-output="shrubDensity">76%</output></span><input type="range" min="0" max="1" step="0.01" data-field="shrubDensity" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>작은 돌 <output data-field-output="rockDensity">42%</output></span><input type="range" min="0" max="1" step="0.01" data-field="rockDensity" /></label>
+                    <label class="range-field"><span>흙 굴곡 <output data-field-output="terrainRelief">38%</output></span><input type="range" min="0" max="1" step="0.01" data-field="terrainRelief" /></label>
+                  </div>
+                </div>
                 <div>
                   <span class="field-label">꽃 구성</span>
                   <div id="field-species" class="species-mix" role="group" aria-label="꽃밭에 포함할 꽃"></div>
@@ -108,7 +119,7 @@
                   <input id="field-seed" type="number" min="1" max="999999" step="1" value="240617" />
                   <button type="button" id="field-regenerate">새 배치</button>
                 </div>
-                <p class="field-lod-note">가까운 꽃은 세부 꽃잎을 유지하고, 먼 꽃은 꽃잎 수와 메시 밀도를 자동으로 줄입니다.</p>
+                <p class="field-lod-note">흙 굴곡 위에 잔풀·수풀·작은 돌을 결정론적으로 섞습니다. 바람장은 수풀과 꽃대·잎·꽃잎에 서로 다른 강성과 난류로 전달됩니다.</p>
               </div>
             </section>
 
