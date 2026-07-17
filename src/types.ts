@@ -1,4 +1,4 @@
-export type FlowerKind = 'radial' | 'sunflower';
+export type FlowerKind = 'radial' | 'sunflower' | 'hydrangea' | 'wisteria';
 
 export type PetalShape = 'round' | 'pointed' | 'lance' | 'notched' | 'spoon';
 
@@ -84,7 +84,7 @@ export interface BloomGrowthProfile {
 
 export type HeadFacing = 'upward' | 'outward' | 'drooping';
 
-export type StemHabit = 'shrub' | 'scape' | 'erect-leafy' | 'woody-branch' | 'aquatic-scape' | 'upright';
+export type StemHabit = 'shrub' | 'scape' | 'erect-leafy' | 'woody-branch' | 'aquatic-scape' | 'upright' | 'climbing-vine';
 
 export type LeafShape =
   | 'compound-pinnate'
@@ -94,7 +94,7 @@ export type LeafShape =
   | 'peltate-orbicular'
   | 'ovate-serrate';
 
-export type LeafArrangement = 'alternate' | 'basal' | 'whorled' | 'clustered' | 'separate-petiole';
+export type LeafArrangement = 'alternate' | 'opposite' | 'basal' | 'whorled' | 'clustered' | 'separate-petiole';
 
 /** Measured plant architecture used by the whole-plant and field renderers. */
 export interface BotanicalArchitecture {
@@ -180,7 +180,22 @@ export interface RenderSettings {
 
 export type SceneMode = 'specimen' | 'field';
 
-export type FieldLayoutMode = 'scatter' | 'species-rows' | 'concentric' | 'species-sectors' | 'radial-composite';
+export type FieldLayoutMode =
+  | 'scatter'
+  | 'species-rows'
+  | 'concentric'
+  | 'species-sectors'
+  | 'radial-composite'
+  | 'flower-tunnel'
+  | 'flower-road-walls';
+
+/** Seeded colour interval applied independently to plants of one species. */
+export interface FieldColorRange {
+  from: string;
+  to: string;
+  /** 0 keeps the preset colour; 1 uses the full interval. */
+  strength: number;
+}
 
 /** Overrides attached to one deterministic field index. Values use botanical units. */
 export interface IndividualFlowerSettings {
@@ -231,6 +246,8 @@ export interface FieldSettings {
   seed: number;
   /** Presets participating in the field mixture. */
   speciesIds: string[];
+  /** Per-species colour intervals; missing entries retain the preset palette. */
+  colorRanges: Record<string, FieldColorRange>;
   /** Per-index settings retained across deterministic field rebuilds. */
   individuals: Record<string, IndividualFlowerSettings>;
 }

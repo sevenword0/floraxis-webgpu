@@ -1,5 +1,6 @@
 import type { FieldSettings } from '../types';
 import { seededRandom } from '../utils';
+import { fieldPathHalfWidth } from './field-layout-patterns';
 
 export interface FieldEnvironmentInstance {
   x: number;
@@ -95,6 +96,7 @@ const scatter = (
 ): FieldEnvironmentInstance[] => {
   const instances: FieldEnvironmentInstance[] = [];
   const usableRadius = Math.max(1, settings.radius * 0.98);
+  const pathHalfWidth = fieldPathHalfWidth(settings);
   for (let index = 0; index < count; index += 1) {
     let x = 0;
     let z = 0;
@@ -104,7 +106,8 @@ const scatter = (
       const angle = random() * TAU;
       x = Math.cos(angle) * distance;
       z = Math.sin(angle) * distance;
-      if (clearOfRoots(x, z, roots, clearance)) {
+      const clearOfPath = pathHalfWidth <= 0 || Math.abs(x) >= pathHalfWidth;
+      if (clearOfPath && clearOfRoots(x, z, roots, clearance)) {
         accepted = true;
         break;
       }

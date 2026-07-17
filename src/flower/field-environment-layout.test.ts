@@ -24,6 +24,7 @@ const settings: FieldSettings = {
   terrainRelief: 0.38,
   seed: 240617,
   speciesIds: ['rose'],
+  colorRanges: {},
   individuals: {},
 };
 
@@ -39,6 +40,13 @@ describe('field environment layout', () => {
     expect([...first.groundCover, ...first.shrubs, ...first.rocks].every((item) =>
       Math.hypot(item.x, item.z) <= settings.radius)).toBe(true);
     expect(first.shrubs.every((item) => Math.hypot(item.x, item.z) >= 0.28)).toBe(true);
+  });
+
+  it('keeps vegetation and stones out of flower-tunnel and double-wall paths', () => {
+    for (const layoutMode of ['flower-tunnel', 'flower-road-walls'] as const) {
+      const layout = generateFieldEnvironmentLayout({ ...settings, layoutMode }, []);
+      expect([...layout.groundCover, ...layout.shrubs, ...layout.rocks].every((item) => Math.abs(item.x) >= 0.72)).toBe(true);
+    }
   });
 
   it('allows every terrain layer to be disabled independently', () => {

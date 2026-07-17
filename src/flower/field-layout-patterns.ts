@@ -1,7 +1,7 @@
 import type { FieldLayoutMode, FieldSettings } from '../types';
 import { seededRandom } from '../utils';
 
-export type FieldLayoutZone = 'scatter' | 'row' | 'ring' | 'sector' | 'center' | 'outer';
+export type FieldLayoutZone = 'scatter' | 'row' | 'ring' | 'sector' | 'center' | 'outer' | 'tunnel' | 'wall';
 
 export interface FieldLayoutAnchor {
   x: number;
@@ -10,6 +10,11 @@ export interface FieldLayoutAnchor {
   groupIndex: number;
   bandIndex: number;
   zone: FieldLayoutZone;
+  /** -1 is the left side of a path, +1 the right side, 0 is not corridor-bound. */
+  side?: -1 | 0 | 1;
+  /** Structural lean for arches and wall-trained plants. */
+  supportLeanDeg?: number;
+  supportLeanAzimuthDeg?: number;
 }
 
 const TAU = Math.PI * 2;
@@ -98,7 +103,17 @@ const modeSalt: Record<FieldLayoutMode, number> = {
   concentric: 0x7f4a7c15,
   'species-sectors': 0x3c6ef372,
   'radial-composite': 0x9e3779b9,
+  'flower-tunnel': 0x2f6e2b1d,
+  'flower-road-walls': 0x4cf5ad43,
 };
+
+export const fieldPathHalfWidth = (
+  settings: Pick<FieldSettings, 'radius' | 'layoutMode'>,
+): number => settings.layoutMode === 'flower-tunnel'
+  ? Math.min(1.35, Math.max(0.82, settings.radius * 0.17))
+  : settings.layoutMode === 'flower-road-walls'
+    ? Math.min(1.18, Math.max(0.72, settings.radius * 0.145))
+    : 0;
 
 /** Generates deterministic pattern anchors before plant-size collision resolution. */
 export const generateFieldLayoutAnchors = (
@@ -155,6 +170,38 @@ export const generateFieldLayoutAnchors = (
     });
   } else if (settings.layoutMode === 'species-sectors') {
     anchors.push(...createSectorAnchors(count, speciesCount, usableRadius * 0.12, usableRadius * 0.93, phase, 'sector'));
+  } else if (settings.layoutMode === 'flower-tunnel' || settings.layoutMode === 'flower-road-walls') {
+    const tunnel = settings.layoutMode === 'flower-tunnel';
+    const lanesPerSide = tunnel ? 2 : 3;
+    const laneCounts = balancedCounts(count, lanesPerSide * 2);
+    const pathHalfWidth = fieldPathHalfWidth(settings);
+    for (let sideIndex = 0; sideIndex < 2; sideIndex += 1) {
+      const side = (sideIndex === 0 ? -1 : 1) as -1 | 1;
+      for (let lane = 0; lane < lanesPerSide; lane += 1) {
+        const bandIndex = sideIndex * lanesPerSide + lane;
+        const laneTotal = laneCounts[bandIndex];
+        const lateral = Math.min(
+          usableRadius * 0.78,
+          pathHalfWidth + spacing * (0.72 + lane * (tunnel ? 1.08 : 0.92)),
+        );
+        const extent = Math.sqrt(Math.max(0, usableRadius * usableRadius - lateral * lateral)) * 0.94;
+        for (let column = 0; column < laneTotal; column += 1) {
+          const pathT = laneTotal <= 1 ? 0.5 : column / (laneTotal - 1);
+          const z = -extent + pathT * extent * 2 + (random() - 0.5) * spacing * 0.16;
+          const grouped = Math.min(speciesCount - 1, Math.floor(pathT * speciesCount));
+          anchors.push({
+            x: side * lateral,
+            z,
+            groupIndex: grouped,
+            bandIndex,
+            zone: tunnel ? 'tunnel' : 'wall',
+            side,
+            supportLeanDeg: tunnel ? 16 - lane * 3 : 5 - lane,
+            supportLeanAzimuthDeg: side < 0 ? 90 : 270,
+          });
+        }
+      }
+    }
   } else {
     const centerCount = Math.max(speciesCount, Math.round(count * 0.22));
     const sectorCount = Math.max(speciesCount, Math.round(count * 0.53));

@@ -2,7 +2,8 @@ import type { FieldSettings, FlowerPreset, IndividualFlowerSettings } from '../t
 import { resolveBotanicalArchitecture, sanitizeIndividualFlowerSettings } from '../data/botanical-architecture';
 import { clamp01, seededRandom } from '../utils';
 import { sampleTerrainHeight } from './field-environment-layout';
-import { generateFieldLayoutAnchors, type FieldLayoutAnchor } from './field-layout-patterns';
+import { fieldPathHalfWidth, generateFieldLayoutAnchors, type FieldLayoutAnchor, type FieldLayoutZone } from './field-layout-patterns';
+import { resolveFlowerColor } from './flower-color-variation';
 
 export type FieldLod = 'near' | 'mid' | 'far';
 
@@ -31,6 +32,11 @@ export interface FieldPlant {
   leafCount: number;
   branchCount: number;
   branchAngleDeg: number;
+  flowerColor: string;
+  layoutZone: FieldLayoutZone;
+  layoutSide: -1 | 0 | 1;
+  supportLeanDeg: number;
+  supportLeanAzimuthDeg: number;
   /** Full-anthesis collision sphere, including a wind allowance. */
   matureRadius: number;
 }
@@ -91,11 +97,17 @@ const distanceSquared = (a: Pick<FieldPlant, 'x' | 'z'>, b: Pick<FieldPlant, 'x'
 const matureHeadCenter = (plant: FieldPlant): { x: number; y: number; z: number } => {
   const tilt = plant.headTiltDeg / 180 * Math.PI;
   const azimuth = plant.headAzimuthDeg / 180 * Math.PI;
-  const horizontalPedicel = Math.sin(tilt) * plant.pedicelWorld;
+  const supportTilt = plant.supportLeanDeg / 180 * Math.PI;
+  const supportAzimuth = plant.supportLeanAzimuthDeg / 180 * Math.PI;
+  const pendantRaceme = plant.presetId === 'wisteria';
+  const verticalPedicel = pendantRaceme ? 0 : Math.cos(tilt) * plant.pedicelWorld;
+  const stemLength = Math.max(0.08, plant.visualHeight - verticalPedicel);
+  const supportReach = Math.sin(supportTilt) * stemLength;
+  const horizontalPedicel = pendantRaceme ? plant.pedicelWorld : Math.sin(tilt) * plant.pedicelWorld;
   return {
-    x: plant.x + Math.sin(azimuth) * horizontalPedicel,
-    y: plant.groundY + plant.visualHeight,
-    z: plant.z + Math.cos(azimuth) * horizontalPedicel,
+    x: plant.x + Math.sin(supportAzimuth) * supportReach + Math.sin(azimuth) * horizontalPedicel,
+    y: plant.groundY + Math.cos(supportTilt) * stemLength + verticalPedicel,
+    z: plant.z + Math.cos(supportAzimuth) * supportReach + Math.cos(azimuth) * horizontalPedicel,
   };
 };
 
@@ -144,7 +156,7 @@ const resolvePlantValues = (
   override: IndividualFlowerSettings | undefined,
   random: () => number,
   wind: number,
-): Omit<FieldPlant, 'index' | 'presetId' | 'x' | 'z' | 'groundY' | 'yaw' | 'bloomDelay' | 'windPhase' | 'lod'> => {
+): Omit<FieldPlant, 'index' | 'presetId' | 'x' | 'z' | 'groundY' | 'yaw' | 'bloomDelay' | 'windPhase' | 'lod' | 'flowerColor' | 'layoutZone' | 'layoutSide' | 'supportLeanDeg' | 'supportLeanAzimuthDeg'> => {
   const architecture = resolveBotanicalArchitecture(preset);
   const safeOverride = override ? sanitizeIndividualFlowerSettings(override, preset) : undefined;
   const heightVariation = 0.94 + random() * 0.12;
@@ -153,7 +165,12 @@ const resolvePlantValues = (
   const sampledAzimuth = (index * 137.507764 + random() * 28) % 360;
   const heightCm = safeOverride?.heightCm ?? architecture.defaultHeightCm * heightVariation;
   const flowerDiameterCm = safeOverride?.flowerDiameterCm ?? architecture.defaultFlowerDiameterCm * diameterVariation;
-  const visualHeight = botanicalHeightToWorld(heightCm);
+  const measuredVisualHeight = botanicalHeightToWorld(heightCm);
+  // A climber's measured height is vine length, not a free-standing vertical
+  // trunk. Cap its displayed elevation to a realistic garden support height.
+  const visualHeight = architecture.stemHabit === 'climbing-vine'
+    ? Math.min(3.35, measuredVisualHeight)
+    : measuredVisualHeight;
   const visualFlowerDiameter = botanicalFlowerDiameterToWorld(flowerDiameterCm);
   const leafScale = safeOverride?.leafScale ?? sampledLeafScale;
   const headAzimuthDeg = safeOverride?.headAzimuthDeg
@@ -175,7 +192,7 @@ const resolvePlantValues = (
     leafCount: safeOverride?.leafCount ?? architecture.leafCount,
     branchCount: safeOverride?.branchCount ?? architecture.branchCount,
     branchAngleDeg: safeOverride?.branchAngleDeg ?? architecture.branchAngleDeg,
-    matureRadius: visualFlowerDiameter * 0.52 + windAllowance,
+    matureRadius: visualFlowerDiameter * (preset.kind === 'wisteria' ? 0.24 : 0.52) + windAllowance,
   };
 };
 
@@ -185,7 +202,9 @@ const relaxMatureCrowns = (
   spacing: number,
   terrainRelief: number,
   seed: number,
+  layoutMode: FieldSettings['layoutMode'],
 ): void => {
+  const corridorHalfWidth = fieldPathHalfWidth({ radius, layoutMode });
   for (let iteration = 0; iteration < 52; iteration += 1) {
     let moved = false;
     for (let a = 0; a < plants.length; a += 1) {
@@ -228,11 +247,18 @@ const relaxMatureCrowns = (
     }
 
     for (const plant of plants) {
-      const radial = Math.hypot(plant.x, plant.z);
       const maxRadius = Math.max(0.12, radius - Math.min(0.18, plant.matureRadius * 0.22));
-      if (radial > maxRadius) {
-        plant.x *= maxRadius / radial;
-        plant.z *= maxRadius / radial;
+      if (plant.layoutSide !== 0 && corridorHalfWidth > 0) {
+        const minimumX = Math.min(maxRadius * 0.82, corridorHalfWidth + spacing * 0.34);
+        plant.x = plant.layoutSide * Math.max(minimumX, Math.abs(plant.x));
+        const maximumZ = Math.sqrt(Math.max(0, maxRadius * maxRadius - plant.x * plant.x));
+        plant.z = Math.min(maximumZ, Math.max(-maximumZ, plant.z));
+      } else {
+        const radial = Math.hypot(plant.x, plant.z);
+        if (radial > maxRadius) {
+          plant.x *= maxRadius / radial;
+          plant.z *= maxRadius / radial;
+        }
       }
       plant.groundY = sampleTerrainHeight(plant.x, plant.z, radius, terrainRelief, seed);
     }
@@ -281,11 +307,16 @@ export const generateFieldLayout = (
         x = anchor.x;
         z = anchor.z;
       } else {
-        const jitterLimit = spacing * (settings.layoutMode === 'scatter' ? 1.45 : 0.92);
+        const corridorBound = anchor.side === -1 || anchor.side === 1;
+        const jitterLimit = spacing * (settings.layoutMode === 'scatter' ? 1.45 : corridorBound ? 0.62 : 0.92);
         const jitterRadius = jitterLimit * Math.sqrt(attempt / 71) * (0.82 + placementRandom() * 0.18);
         const angle = index * GOLDEN_ANGLE + attempt * GOLDEN_ANGLE + placementRandom() * 0.24;
-        x = anchor.x + Math.cos(angle) * jitterRadius;
+        x = anchor.x + Math.cos(angle) * jitterRadius * (corridorBound ? 0.28 : 1);
         z = anchor.z + Math.sin(angle) * jitterRadius;
+        if (corridorBound) {
+          const minimumX = fieldPathHalfWidth(settings) + spacing * 0.34;
+          x = anchor.side! * Math.max(minimumX, Math.abs(x));
+        }
         const radial = Math.hypot(x, z);
         if (radial > usableRadius) {
           x *= usableRadius / radial;
@@ -299,6 +330,11 @@ export const generateFieldLayout = (
         x,
         z,
         groundY: sampleTerrainHeight(x, z, radius, settings.terrainRelief, settings.seed),
+        flowerColor: preset.colors.base,
+        layoutZone: anchor.zone,
+        layoutSide: anchor.side ?? 0,
+        supportLeanDeg: anchor.supportLeanDeg ?? 0,
+        supportLeanAzimuthDeg: anchor.supportLeanAzimuthDeg ?? 0,
       } as FieldPlant;
       if (plants.every((plant) => {
         const stemClearance = spacing * (0.9 + (candidate.visualHeight + plant.visualHeight) * 0.012);
@@ -321,6 +357,7 @@ export const generateFieldLayout = (
     const waveCoordinate = clamp01(x / (radius * 2) + 0.5);
     const waveDelay = clamp01(settings.bloomWave) * waveCoordinate * 0.3;
     const variationDelay = random() * clamp01(settings.bloomVariance) * 0.24;
+    const colorRandom = seededRandom(Math.imul(seed ^ (index + 1), 0x6c8e9cf5) ^ 0xb5297a4d);
 
     plants.push({
       ...values,
@@ -333,10 +370,15 @@ export const generateFieldLayout = (
       bloomDelay: Math.min(0.52, waveDelay + variationDelay),
       windPhase: random() * TAU,
       lod,
+      flowerColor: resolveFlowerColor(preset.colors.base, settings.colorRanges?.[presetId], colorRandom()),
+      layoutZone: anchor.zone,
+      layoutSide: anchor.side ?? 0,
+      supportLeanDeg: anchor.supportLeanDeg ?? 0,
+      supportLeanAzimuthDeg: anchor.supportLeanAzimuthDeg ?? 0,
     });
   }
 
-  relaxMatureCrowns(plants, radius, spacing, settings.terrainRelief, settings.seed);
+  relaxMatureCrowns(plants, radius, spacing, settings.terrainRelief, settings.seed, settings.layoutMode);
   for (const plant of plants) {
     plant.groundY = sampleTerrainHeight(plant.x, plant.z, radius, settings.terrainRelief, settings.seed);
   }

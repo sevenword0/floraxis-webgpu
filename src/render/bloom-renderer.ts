@@ -180,6 +180,9 @@ export class BloomRenderer {
   private sceneMode: SceneMode = 'specimen';
   private fieldRadius = 6.5;
   private fieldHeight = 3.2;
+  private fieldLayoutMode: FieldSettings['layoutMode'] = 'scatter';
+  private specimenTargetY = 1.68;
+  private specimenCameraScale = 1;
   private readonly specimenStage = new THREE.Group();
   private bloomProgress = 0;
   private settings!: RenderSettings;
@@ -486,11 +489,15 @@ export class BloomRenderer {
     this.scene.add(this.subject.root);
     this.subject.update(this.bloomProgress, performance.now());
     this.setSceneMode('specimen');
+    this.specimenTargetY = preset.kind === 'hydrangea' ? 2.05 : preset.kind === 'wisteria' ? 2.32 : 1.68;
+    this.specimenCameraScale = preset.kind === 'hydrangea' ? 1.2 : preset.kind === 'wisteria' ? 1.34 : 1;
+    this.focusFlower();
   }
 
   setField(settings: FieldSettings, presets: FlowerPreset[]): void {
     const changedMode = this.sceneMode !== 'field';
     this.fieldRadius = settings.radius;
+    this.fieldLayoutMode = settings.layoutMode;
     this.subject?.dispose();
     const field = new FlowerField(settings, presets);
     this.fieldHeight = field.maxHeight;
@@ -578,8 +585,8 @@ export class BloomRenderer {
   }
 
   focusFlower(): void {
-    const targetY = 1.68;
-    const narrowScale = this.width / Math.max(1, this.height) < 0.72 ? 1.18 : 1;
+    const targetY = this.specimenTargetY;
+    const narrowScale = (this.width / Math.max(1, this.height) < 0.72 ? 1.18 : 1) * this.specimenCameraScale;
     this.camera.position.set(4.1 * narrowScale, targetY + (2.9 - targetY) * narrowScale, 5.5 * narrowScale);
     this.controls.target.set(0, targetY, 0);
     this.controls.minDistance = 2.7;
@@ -594,6 +601,18 @@ export class BloomRenderer {
     const safeHeight = Math.min(7, Math.max(1.2, fieldHeight));
     const targetY = Math.min(2.2, safeHeight * 0.34);
     const narrowScale = this.width / Math.max(1, this.height) < 0.72 ? 1.2 : 1;
+    if (this.fieldLayoutMode === 'flower-tunnel' || this.fieldLayoutMode === 'flower-road-walls') {
+      const tunnel = this.fieldLayoutMode === 'flower-tunnel';
+      const corridorTargetY = tunnel ? Math.min(1.75, safeHeight * 0.32) : Math.min(1.45, safeHeight * 0.27);
+      this.camera.position.set(0, corridorTargetY + (tunnel ? 0.58 : 0.7), safeRadius * 2.55 * narrowScale);
+      this.controls.target.set(0, corridorTargetY, -safeRadius * 0.12);
+      this.controls.minDistance = 3.4;
+      this.controls.maxDistance = 36;
+      this.controls.maxPolarAngle = Math.PI * 0.64;
+      this.setShadowExtent(safeRadius + 2.2, Math.max(safeRadius + 4.5, safeHeight + 2));
+      this.controls.update();
+      return;
+    }
     this.camera.position.set(
       safeRadius * 1.55 * narrowScale,
       (safeRadius * 1.05 + safeHeight * 0.62 + 2.4) * narrowScale,

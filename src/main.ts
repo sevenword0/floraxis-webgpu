@@ -70,6 +70,12 @@ const DEFAULT_RENDER: RenderSettings = {
   defocusGamma: 1,
 };
 
+const DEFAULT_COLOR_RANGES = Object.fromEntries(PRESETS.map((preset) => [preset.id, {
+  from: preset.colors.base,
+  to: preset.colors.tip,
+  strength: preset.id === 'hydrangea' ? 0.58 : preset.id === 'wisteria' ? 0.36 : 0.18,
+}]));
+
 const DEFAULT_FIELD: FieldSettings = {
   count: 120,
   radius: 6.5,
@@ -88,6 +94,7 @@ const DEFAULT_FIELD: FieldSettings = {
   terrainRelief: 0.38,
   seed: 240617,
   speciesIds: PRESETS.map((preset) => preset.id),
+  colorRanges: DEFAULT_COLOR_RANGES,
   individuals: {},
 };
 
@@ -100,7 +107,12 @@ const state: AppState = {
   direction: 1,
   speed: 1,
   render: { ...DEFAULT_RENDER },
-  field: { ...DEFAULT_FIELD, speciesIds: [...DEFAULT_FIELD.speciesIds], individuals: {} },
+  field: {
+    ...DEFAULT_FIELD,
+    speciesIds: [...DEFAULT_FIELD.speciesIds],
+    colorRanges: Object.fromEntries(Object.entries(DEFAULT_FIELD.colorRanges).map(([key, value]) => [key, { ...value }])),
+    individuals: {},
+  },
 };
 
 const host = qs<HTMLElement>('#render-host');
@@ -122,6 +134,7 @@ let fieldRebuildTimer = 0;
 let refocusFieldAfterRebuild = false;
 let lastStatsUpdate = 0;
 let selectedFlowerIndex = 0;
+let selectedColorSpeciesId = PRESETS[0].id;
 let environmentImageLabel = '내장 절차 파노라마 · 2:1';
 
 type FieldNumericKey =
@@ -160,6 +173,8 @@ const FIELD_LAYOUT_NOTES: Record<FieldLayoutMode, string> = {
   concentric: '지정한 수의 원형 식재 띠를 만듭니다. 혼합 0%에서는 각 원 안의 종별 구간이 유지됩니다.',
   'species-sectors': '각 종을 하나의 부채꼴 구역에 모아 방사형 군락을 만듭니다.',
   'radial-composite': '중심 원형 군락, 종별 중간 부채꼴, 외곽 동심원 띠를 하나의 꽃밭으로 결합합니다.',
+  'flower-tunnel': '가운데 보행 폭을 비우고 양쪽 식재를 아치 안쪽으로 유인합니다. 목재 퍼골라와 천장 레일이 꽃 터널을 지지합니다.',
+  'flower-road-walls': '가운데 꽃길을 비운 채 양쪽에 여러 식재 띠와 수직 트렐리스 벽을 평행하게 배치합니다.',
 };
 
 try {
@@ -197,6 +212,7 @@ const setFieldSpeciesEnabled = (presetId: string, enabled: boolean): void => {
     return;
   }
   state.field.speciesIds = PRESETS.map((preset) => preset.id).filter((id) => selected.has(id));
+  if (!selected.has(selectedColorSpeciesId)) selectedColorSpeciesId = state.field.speciesIds[0];
   updateFieldUI();
   updatePresetUI();
   scheduleFieldRebuild();
@@ -220,6 +236,27 @@ const renderFieldSpeciesControls = (): void => {
     label.append(input, dot, text);
     return label;
   }));
+  const optionNodes = PRESETS.map((preset) => {
+    const option = document.createElement('option');
+    option.value = preset.id;
+    option.textContent = preset.name;
+    return option;
+  });
+  qs<HTMLSelectElement>('#individual-species').replaceChildren(...optionNodes.map((option) => option.cloneNode(true)));
+  qs<HTMLSelectElement>('#field-color-species').replaceChildren(...optionNodes);
+};
+
+const updateFieldColorUI = (): void => {
+  const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];
+  selectedColorSpeciesId = preset.id;
+  const range = state.field.colorRanges[preset.id] ?? { from: preset.colors.base, to: preset.colors.tip, strength: 0 };
+  qs<HTMLSelectElement>('#field-color-species').value = preset.id;
+  qs<HTMLInputElement>('#field-color-from').value = range.from;
+  qs<HTMLInputElement>('#field-color-to').value = range.to;
+  const strength = qs<HTMLInputElement>('#field-color-strength');
+  strength.value = String(range.strength);
+  updateRangeVisual(strength);
+  qs<HTMLOutputElement>('#field-color-strength-output').value = `${Math.round(range.strength * 100)}%`;
 };
 
 const renderStageControls = (): void => {
@@ -275,6 +312,7 @@ const updateFieldUI = (): void => {
   });
   qs<HTMLElement>('#field-summary-count').textContent = String(state.field.count);
   qs<HTMLElement>('#field-summary-species').textContent = String(state.field.speciesIds.length);
+  updateFieldColorUI();
   selectedFlowerIndex = Math.min(Math.max(0, selectedFlowerIndex), Math.max(0, state.field.count - 1));
   updateIndividualFlowerUI();
 };
@@ -761,7 +799,7 @@ const wireEvents = (): void => {
   qs<HTMLSelectElement>('#field-layout').addEventListener('change', (event) => {
     state.field.layoutMode = (event.currentTarget as HTMLSelectElement).value as FieldLayoutMode;
     updateFieldUI();
-    scheduleFieldRebuild();
+    scheduleFieldRebuild(true);
     showToast(`꽃밭 배치를 '${(event.currentTarget as HTMLSelectElement).selectedOptions[0].text}' 방식으로 바꿨습니다.`);
   });
   qs<HTMLInputElement>('#field-seed').addEventListener('change', (event) => {
@@ -775,6 +813,34 @@ const wireEvents = (): void => {
     updateFieldUI();
     scheduleFieldRebuild();
     showToast(`새 배치 시드 ${state.field.seed}를 적용했습니다.`);
+  });
+  qs<HTMLSelectElement>('#field-color-species').addEventListener('change', (event) => {
+    selectedColorSpeciesId = (event.currentTarget as HTMLSelectElement).value;
+    updateFieldColorUI();
+  });
+  for (const id of ['field-color-from', 'field-color-to'] as const) {
+    qs<HTMLInputElement>(`#${id}`).addEventListener('input', (event) => {
+      const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];
+      const range = state.field.colorRanges[preset.id] ?? { from: preset.colors.base, to: preset.colors.tip, strength: 0 };
+      const key = id === 'field-color-from' ? 'from' : 'to';
+      state.field.colorRanges[preset.id] = { ...range, [key]: (event.currentTarget as HTMLInputElement).value };
+      updateFieldColorUI();
+      scheduleFieldRebuild();
+    });
+  }
+  qs<HTMLInputElement>('#field-color-strength').addEventListener('input', (event) => {
+    const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];
+    const range = state.field.colorRanges[preset.id] ?? { from: preset.colors.base, to: preset.colors.tip, strength: 0 };
+    state.field.colorRanges[preset.id] = { ...range, strength: Number((event.currentTarget as HTMLInputElement).value) };
+    updateFieldColorUI();
+    scheduleFieldRebuild();
+  });
+  qs<HTMLButtonElement>('#field-color-reset').addEventListener('click', () => {
+    const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];
+    state.field.colorRanges[preset.id] = { from: preset.colors.base, to: preset.colors.tip, strength: 0 };
+    updateFieldColorUI();
+    scheduleFieldRebuild();
+    showToast(`${preset.name}의 개체별 색상 범위를 초기화했습니다.`);
   });
 
   const selectFlowerIndex = (next: number): void => {
@@ -992,7 +1058,7 @@ const wireEvents = (): void => {
       playButton.click();
     } else if (event.key.toLowerCase() === 'r') {
       renderer?.focusScene();
-    } else if (/^[1-6]$/.test(event.key)) {
+    } else if (/^[1-8]$/.test(event.key)) {
       selectPreset(PRESETS[Number(event.key) - 1]);
     } else if (event.key === 'Escape') {
       closeMobilePanels();

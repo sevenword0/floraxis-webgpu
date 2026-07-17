@@ -4,8 +4,8 @@ import { resolveBotanicalArchitecture } from './botanical-architecture';
 import { sanitizePreset, validatePreset } from '../utils';
 
 describe('botanical presets', () => {
-  it('ships six distinct, research-backed species presets', () => {
-    expect(PRESETS).toHaveLength(6);
+  it('ships eight distinct, research-backed species presets', () => {
+    expect(PRESETS).toHaveLength(8);
     expect(new Set(PRESETS.map((preset) => preset.id)).size).toBe(PRESETS.length);
     for (const preset of PRESETS) {
       expect(validatePreset(preset)).toBe(true);
@@ -34,6 +34,17 @@ describe('botanical presets', () => {
       expect(architecture.leafCount).toBeGreaterThanOrEqual(0);
       expect(architecture.notes.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it('includes compound hydrangea and pendant wisteria inflorescences', () => {
+    const hydrangea = PRESETS.find((preset) => preset.id === 'hydrangea');
+    const wisteria = PRESETS.find((preset) => preset.id === 'wisteria');
+    expect(hydrangea?.kind).toBe('hydrangea');
+    expect(hydrangea?.morphology.petalCount).toBe(96);
+    expect(hydrangea?.structure.some((item) => item.includes('장식화'))).toBe(true);
+    expect(wisteria?.kind).toBe('wisteria');
+    expect(wisteria?.architecture?.stemHabit).toBe('climbing-vine');
+    expect(wisteria?.structure.some((item) => item.includes('하수'))).toBe(true);
   });
 
   it('keeps sunflower disc florets as a composite head', () => {

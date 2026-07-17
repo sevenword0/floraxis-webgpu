@@ -14,7 +14,7 @@ const settings: Pick<FieldSettings, 'count' | 'radius' | 'spacing' | 'seed' | 'l
 
 describe('field layout patterns', () => {
   it('is deterministic and keeps every mode inside the planting circle', () => {
-    const modes = ['scatter', 'species-rows', 'concentric', 'species-sectors', 'radial-composite'] as const;
+    const modes = ['scatter', 'species-rows', 'concentric', 'species-sectors', 'radial-composite', 'flower-tunnel', 'flower-road-walls'] as const;
     for (const layoutMode of modes) {
       const first = generateFieldLayoutAnchors({ ...settings, layoutMode }, 6);
       const second = generateFieldLayoutAnchors({ ...settings, layoutMode }, 6);
@@ -23,6 +23,18 @@ describe('field layout patterns', () => {
       expect(first.every((anchor) => Math.hypot(anchor.x, anchor.z) <= settings.radius)).toBe(true);
       expect(first.every((anchor) => anchor.groupIndex >= 0 && anchor.groupIndex < 6)).toBe(true);
     }
+  });
+
+  it('keeps a clear central path and two planted sides in corridor modes', () => {
+    for (const layoutMode of ['flower-tunnel', 'flower-road-walls'] as const) {
+      const anchors = generateFieldLayoutAnchors({ ...settings, layoutMode }, 6);
+      expect(new Set(anchors.map((anchor) => anchor.side))).toEqual(new Set([-1, 1]));
+      expect(anchors.every((anchor) => Math.abs(anchor.x) > 0.7)).toBe(true);
+      expect(anchors.every((anchor) => anchor.supportLeanDeg! > 0)).toBe(true);
+    }
+    const tunnel = generateFieldLayoutAnchors({ ...settings, layoutMode: 'flower-tunnel' }, 6);
+    expect(tunnel.every((anchor) => anchor.zone === 'tunnel')).toBe(true);
+    expect(Math.min(...tunnel.map((anchor) => anchor.supportLeanDeg!))).toBeGreaterThan(10);
   });
 
   it('allocates the requested number of rows to every species', () => {

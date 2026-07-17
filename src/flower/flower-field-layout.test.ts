@@ -29,6 +29,7 @@ const settings: FieldSettings = {
   terrainRelief: 0.32,
   seed: 8128,
   speciesIds: ['rose', 'tulip', 'lily'],
+  colorRanges: {},
   individuals: {},
 };
 
@@ -80,7 +81,7 @@ describe('preset flower-field layout', () => {
   });
 
   it('keeps organised species groups at zero mixing and randomises only species at full mixing', () => {
-    const modes = ['scatter', 'species-rows', 'concentric', 'species-sectors', 'radial-composite'] as const;
+    const modes = ['scatter', 'species-rows', 'concentric', 'species-sectors', 'radial-composite', 'flower-tunnel', 'flower-road-walls'] as const;
     const speciesPresets = PRESETS.slice(0, 3);
     for (const layoutMode of modes) {
       const layoutSettings = { ...settings, layoutMode, mixStrength: 0, count: 72, radius: 7 };
@@ -98,7 +99,7 @@ describe('preset flower-field layout', () => {
   });
 
   it('keeps mature crowns separate in every structured layout', () => {
-    const modes = ['species-rows', 'concentric', 'species-sectors', 'radial-composite'] as const;
+    const modes = ['species-rows', 'concentric', 'species-sectors', 'radial-composite', 'flower-tunnel', 'flower-road-walls'] as const;
     for (const layoutMode of modes) {
       const plants = generateFieldLayout({
         ...settings,
@@ -116,6 +117,24 @@ describe('preset flower-field layout', () => {
         }
       }
     }
+  });
+
+  it('assigns stable per-species colours and preserves corridor sides', () => {
+    const coloured = generateFieldLayout({
+      ...settings,
+      layoutMode: 'flower-tunnel',
+      speciesIds: ['hydrangea'],
+      colorRanges: { hydrangea: { from: '#3050a0', to: '#e89ac4', strength: 1 } },
+    }, PRESETS);
+    expect(coloured).toEqual(generateFieldLayout({
+      ...settings,
+      layoutMode: 'flower-tunnel',
+      speciesIds: ['hydrangea'],
+      colorRanges: { hydrangea: { from: '#3050a0', to: '#e89ac4', strength: 1 } },
+    }, PRESETS));
+    expect(new Set(coloured.map((plant) => plant.flowerColor)).size).toBeGreaterThan(10);
+    expect(coloured.every((plant) => Math.abs(plant.x) > 0.7)).toBe(true);
+    expect(new Set(coloured.map((plant) => plant.layoutSide))).toEqual(new Set([-1, 1]));
   });
 
   it('uses the tilted pedicel endpoint rather than only the stem roots for collisions', () => {

@@ -104,6 +104,7 @@ export const STEM_HABIT_LABEL: Record<StemHabit, string> = {
   'woody-branch': '목질 가지',
   'aquatic-scape': '수생 꽃자루',
   upright: '직립 줄기',
+  'climbing-vine': '목질 덩굴',
 };
 
 export const LEAF_SHAPE_LABEL: Record<LeafShape, string> = {

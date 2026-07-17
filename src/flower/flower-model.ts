@@ -8,6 +8,10 @@ import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from 
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
 import { createLeafGeometry } from './leaf-geometry';
+import {
+  generateInflorescencePetalSpecs,
+  type InflorescencePetalSpec,
+} from './inflorescence-layout';
 
 interface PetalUnfurlMotion {
   layer: number;
@@ -52,6 +56,14 @@ interface DiscFloret {
   delay: number;
 }
 
+interface InflorescencePetalMotion {
+  frame: THREE.Group;
+  radial: THREE.Group;
+  hinge: THREE.Group;
+  mesh: THREE.Mesh;
+  spec: InflorescencePetalSpec;
+}
+
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const DEG = Math.PI / 180;
 
@@ -73,6 +85,7 @@ export class FlowerModel implements Bloomable {
   private readonly revealGroups: THREE.Object3D[] = [];
   private readonly stamenGroup = new THREE.Group();
   private readonly discFlorets: DiscFloret[] = [];
+  private readonly inflorescencePetals: InflorescencePetalMotion[] = [];
   private discMesh?: THREE.InstancedMesh;
   private readonly dummy = new THREE.Object3D();
   private lastProgress = -1;
@@ -99,12 +112,17 @@ export class FlowerModel implements Bloomable {
     this.petalCount = preset.morphology.petalCount + (preset.kind === 'sunflower' ? preset.morphology.discCount : 0);
     this.root.name = `flower-${preset.id}`;
     this.buildStem();
-    this.head.position.y = preset.morphology.stemHeight;
+    this.head.position.set(
+      preset.kind === 'wisteria' ? 0.62 : 0,
+      preset.morphology.stemHeight,
+      0,
+    );
     this.head.rotation.set(this.headBaseTilt, this.headBaseYaw, 0, 'YXZ');
     this.head.scale.setScalar(preset.morphology.flowerScale);
     this.root.add(this.head);
     this.buildFloralAttachment();
     if (preset.kind === 'sunflower') this.buildSunflower();
+    else if (preset.kind === 'hydrangea' || preset.kind === 'wisteria') this.buildCompoundInflorescence();
     else this.buildRadialFlower();
     this.update(0, 0);
   }
@@ -132,8 +150,9 @@ export class FlowerModel implements Bloomable {
 
     const leafGeometry = this.track(createLeafGeometry(architecture.leafShape));
     const leafCount = Math.min(10, Math.max(0, architecture.leafCount));
-    const leafLength = THREE.MathUtils.clamp(architecture.leafLengthCm / 18, 0.28, 2.2);
-    const leafWidth = THREE.MathUtils.clamp(architecture.leafWidthCm / 14, 0.16, 2.1);
+    const climbingVine = architecture.stemHabit === 'climbing-vine';
+    const leafLength = THREE.MathUtils.clamp(architecture.leafLengthCm / (climbingVine ? 45 : 18), 0.28, 2.2);
+    const leafWidth = THREE.MathUtils.clamp(architecture.leafWidthCm / (climbingVine ? 28 : 14), 0.16, 2.1);
     Array.from({ length: leafCount }, (_, index) => {
       const fraction = index / Math.max(1, leafCount - 1);
       const basal = architecture.leafArrangement === 'basal';
@@ -171,6 +190,15 @@ export class FlowerModel implements Bloomable {
         branch.castShadow = true;
         this.root.add(branch);
       }
+    }
+    if (this.preset.kind === 'wisteria') {
+      const hangerLength = 0.62;
+      const hangerGeometry = this.track(new THREE.CylinderGeometry(m.stemRadius * 0.48, m.stemRadius * 0.62, hangerLength, 10, 2));
+      const hanger = new THREE.Mesh(hangerGeometry, stemMaterial);
+      hanger.position.set(hangerLength * 0.5, m.stemHeight, 0);
+      hanger.rotation.z = -Math.PI * 0.5;
+      hanger.castShadow = true;
+      this.root.add(hanger);
     }
   }
 
@@ -321,6 +349,83 @@ export class FlowerModel implements Bloomable {
 
     this.buildSepals();
     this.buildReproductiveCenter();
+  }
+
+  private buildCompoundInflorescence(): void {
+    const { morphology: m, colors, kind } = this.preset;
+    if (kind !== 'hydrangea' && kind !== 'wisteria') return;
+    const material = this.track(createPetalMaterial(colors, m));
+    const geometry = this.track(createPetalGeometry({
+      length: m.petalLength,
+      width: m.petalWidth,
+      shape: m.petalShape,
+      taper: m.taper,
+      notch: m.notch,
+      waviness: m.waviness,
+      cup: m.cup,
+      curl: m.curl,
+      fold: m.fold,
+      seed: this.preset.id.length * 31,
+      thickness: resolvePetalThickness(m.petalLength),
+      growth: this.growth,
+      colors,
+    }));
+    const specs = generateInflorescencePetalSpecs(kind, m.petalCount);
+    const localForward = new THREE.Vector3(0, 0, 1);
+    const outward = new THREE.Vector3();
+
+    for (const spec of specs) {
+      const frame = new THREE.Group();
+      frame.position.set(spec.originX, spec.originY, spec.originZ);
+      outward.set(spec.normalX, spec.normalY, spec.normalZ).normalize();
+      frame.quaternion.setFromUnitVectors(localForward, outward);
+      const radial = new THREE.Group();
+      radial.rotation.z = spec.angle;
+      const hinge = new THREE.Group();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.scale.setScalar(spec.scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      hinge.add(mesh);
+      radial.add(hinge);
+      frame.add(radial);
+      this.head.add(frame);
+      this.inflorescencePetals.push({ frame, radial, hinge, mesh, spec });
+    }
+
+    if (kind === 'hydrangea') {
+      const coreMaterial = this.track(makeStandardMaterial({ color: '#355c48', roughness: 0.92 }));
+      const core = new THREE.Mesh(this.track(new THREE.SphereGeometry(0.32, 28, 18)), coreMaterial);
+      core.scale.set(1, 0.82, 1);
+      core.position.y = 0.05;
+      core.castShadow = true;
+      this.head.add(core);
+    } else {
+      const axisMaterial = this.track(makeStandardMaterial({ color: colors.stem, roughness: 0.9 }));
+      const axisGeometry = this.track(new THREE.CylinderGeometry(0.018, 0.028, 1.34, 8, 4));
+      const axis = new THREE.Mesh(axisGeometry, axisMaterial);
+      axis.position.y = -0.62;
+      axis.castShadow = true;
+      this.head.add(axis);
+    }
+
+    const floretCount = new Set(specs.map((spec) => spec.floretIndex)).size;
+    const centreGeometry = this.track(new THREE.SphereGeometry(kind === 'hydrangea' ? 0.035 : 0.028, 8, 6));
+    const centreMaterial = this.track(makeStandardMaterial({ color: colors.center, roughness: 0.78 }));
+    const centres = new THREE.InstancedMesh(centreGeometry, centreMaterial, floretCount);
+    centres.castShadow = true;
+    for (let floret = 0; floret < floretCount; floret += 1) {
+      const spec = specs.find((item) => item.floretIndex === floret)!;
+      this.dummy.position.set(
+        spec.originX + spec.normalX * 0.018,
+        spec.originY + spec.normalY * 0.018,
+        spec.originZ + spec.normalZ * 0.018,
+      );
+      this.dummy.scale.setScalar(spec.role === 'fertile' ? 0.72 : 1);
+      this.dummy.updateMatrix();
+      centres.setMatrixAt(floret, this.dummy.matrix);
+    }
+    this.head.add(centres);
   }
 
   private buildSunflower(): void {
@@ -602,6 +707,21 @@ export class FlowerModel implements Bloomable {
         petal.mesh.morphTargetInfluences![0] = local;
       }
       petal.mesh.scale.setScalar(1);
+    }
+    for (const petal of this.inflorescencePetals) {
+      const local = remapBloom(progress, petal.spec.delay, petal.spec.span);
+      const deployment = smoothstep(0.02, 0.96, local);
+      const clusterSpread = THREE.MathUtils.lerp(0.62, 1, smoothstep(0, this.growth.swellingEnd, progress));
+      petal.frame.position.set(
+        petal.spec.originX * clusterSpread,
+        petal.spec.originY * clusterSpread,
+        petal.spec.originZ * clusterSpread,
+      );
+      petal.hinge.rotation.x = THREE.MathUtils.lerp(-1.12, 0.04, deployment);
+      petal.hinge.rotation.y = Math.sin(subtleTime * 0.47 + petal.spec.phase) * 0.025 * smoothstep(0.72, 1, progress);
+      petal.radial.rotation.z = petal.spec.angle + Math.sin(subtleTime * 0.31 + petal.spec.phase) * 0.01;
+      petal.mesh.scale.setScalar(petal.spec.scale * THREE.MathUtils.lerp(0.74, 1, deployment));
+      petal.mesh.morphTargetInfluences![0] = local;
     }
     for (const sepal of this.sepals) {
       const local = remapBloom(progress, sepal.delay, sepal.span);

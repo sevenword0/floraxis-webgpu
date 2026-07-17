@@ -9,6 +9,8 @@ import { evaluatePetalUnfurl } from './petal-unfurl';
 import { createLeafGeometry } from './leaf-geometry';
 import { FieldTerrain } from './field-terrain';
 import { sampleWindBend } from './field-environment-layout';
+import { generateInflorescencePetalSpecs, type InflorescencePetalSpec } from './inflorescence-layout';
+import { generateFieldSupportSegments } from './field-support-layout';
 import {
   botanicalLengthToWorld,
   evaluateFieldBloom,
@@ -34,6 +36,7 @@ interface FieldPetalSpec {
   laneLift: number;
   openDrift: number;
   contactGuard: number;
+  inflorescence?: InflorescencePetalSpec;
 }
 
 interface FieldSepalSpec {
@@ -102,6 +105,8 @@ const PETAL_CAPS: Record<string, number> = {
   sakura: 5,
   lotus: 16,
   sunflower: 24,
+  hydrangea: 64,
+  wisteria: 60,
 };
 
 const LOD_FACTOR: Record<FieldLod, number> = { near: 1, mid: 0.72, far: 0.48 };
@@ -111,12 +116,16 @@ const minimumPetals = (preset: FlowerPreset): number => {
   if (preset.id === 'rose') return 10;
   if (preset.id === 'lotus') return 8;
   if (preset.kind === 'sunflower') return 12;
+  if (preset.kind === 'hydrangea') return 32;
+  if (preset.kind === 'wisteria') return 30;
   return 5;
 };
 
 const visiblePetalCount = (preset: FlowerPreset, lod: FieldLod): number => {
   const cap = Math.min(preset.morphology.petalCount, PETAL_CAPS[preset.id] ?? 18);
-  return Math.max(minimumPetals(preset), Math.round(cap * LOD_FACTOR[lod]));
+  const raw = Math.max(minimumPetals(preset), Math.round(cap * LOD_FACTOR[lod]));
+  const floretUnit = preset.kind === 'hydrangea' ? 4 : preset.kind === 'wisteria' ? 5 : 1;
+  return Math.min(cap, Math.max(minimumPetals(preset), Math.round(raw / floretUnit) * floretUnit));
 };
 
 const visibleLeafCount = (plant: FieldPlant): number => {
@@ -126,6 +135,8 @@ const visibleLeafCount = (plant: FieldPlant): number => {
 
 const deployedHeadDiameter = (preset: FlowerPreset): number => {
   const m = preset.morphology;
+  if (preset.kind === 'hydrangea') return 1.42;
+  if (preset.kind === 'wisteria') return 1.36;
   return Math.max(0.2, (m.headRadius + m.petalLength * (preset.kind === 'sunflower' ? 0.96 : 0.9)) * 2);
 };
 
@@ -187,11 +198,14 @@ export class FlowerField implements Bloomable {
   private readonly tiltQuaternion = new THREE.Quaternion();
   private readonly yawQuaternion = new THREE.Quaternion();
   private readonly right = new THREE.Vector3(1, 0, 0);
+  private readonly forward = new THREE.Vector3(0, 0, 1);
+  private readonly outward = new THREE.Vector3();
 
   constructor(settings: FieldSettings, presets: FlowerPreset[]) {
     this.settings = {
       ...settings,
       speciesIds: [...settings.speciesIds],
+      colorRanges: Object.fromEntries(Object.entries(settings.colorRanges ?? {}).map(([key, value]) => [key, { ...value }])),
       individuals: Object.fromEntries(Object.entries(settings.individuals ?? {}).map(([key, value]) => [key, { ...value }])),
     };
     this.root.name = 'preset-flower-field';
@@ -212,6 +226,7 @@ export class FlowerField implements Bloomable {
       const preset = presetById.get(presetId);
       if (preset) this.batches.push(this.buildSpeciesBatch(preset, speciesPlants));
     }
+    this.buildFieldSupports();
     this.petalCount = this.batches.reduce((total, batch) => total + batch.petals.length, 0);
     this.update(0, 0);
   }
@@ -231,8 +246,51 @@ export class FlowerField implements Bloomable {
     return mesh;
   }
 
+  private buildFieldSupports(): void {
+    const segments = generateFieldSupportSegments(this.settings, this.maxHeight);
+    if (segments.length === 0) return;
+    const geometry = this.track(new THREE.CylinderGeometry(1, 1, 1, 8, 1));
+    const material = this.track(new THREE.MeshStandardNodeMaterial({
+      color: this.settings.layoutMode === 'flower-tunnel' ? '#70583f' : '#53625a',
+      roughness: 0.88,
+      metalness: this.settings.layoutMode === 'flower-tunnel' ? 0 : 0.12,
+    }));
+    const mesh = this.prepareInstancedMesh(new THREE.InstancedMesh(geometry, material, segments.length), false);
+    segments.forEach((item, index) => {
+      this.setCylinderBetween(
+        mesh,
+        index,
+        new THREE.Vector3(item.start.x, item.start.y, item.start.z),
+        new THREE.Vector3(item.end.x, item.end.y, item.end.z),
+        item.radius,
+      );
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
   private createPetalSpecs(preset: FlowerPreset, count: number, growth: BloomGrowthProfile): FieldPetalSpec[] {
     const m = preset.morphology;
+    if (preset.kind === 'hydrangea' || preset.kind === 'wisteria') {
+      return generateInflorescencePetalSpecs(preset.kind, count).map((inflorescence) => ({
+        angle: inflorescence.angle,
+        layer: inflorescence.axisT,
+        delay: inflorescence.delay,
+        span: inflorescence.span,
+        openAngle: m.openAngle,
+        closedAngle: m.closedAngle,
+        closedRoll: 0,
+        roll: 0,
+        sweep: 0,
+        phase: inflorescence.phase,
+        radialBase: 0,
+        baseLift: 0,
+        laneDepth: 0,
+        laneLift: 0,
+        openDrift: 0,
+        contactGuard: 0,
+        inflorescence,
+      }));
+    }
     const layerCounts = distributePetals(count, m.layers);
     const specs: FieldPetalSpec[] = [];
     const usesUnfurl = m.budCurl > 0.01;
@@ -365,6 +423,10 @@ export class FlowerField implements Bloomable {
 
     const centreGeometry = preset.kind === 'sunflower'
       ? this.track(new THREE.CylinderGeometry(m.headRadius, m.headRadius * 0.88, 0.18, 28))
+      : preset.kind === 'hydrangea'
+        ? this.track(new THREE.SphereGeometry(0.32, 18, 12))
+        : preset.kind === 'wisteria'
+          ? this.track(new THREE.CylinderGeometry(0.018, 0.028, 1.34, 8, 4))
       : preset.id === 'lotus'
         ? this.track(new THREE.CylinderGeometry(0.22, 0.12, 0.28, 22))
         : this.track(new THREE.SphereGeometry(Math.max(0.075, m.headRadius * 0.54), 16, 9));
@@ -397,6 +459,16 @@ export class FlowerField implements Bloomable {
     const petalMaterial = this.track(createPetalMaterial(preset.colors, m));
     const petalMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(petalGeometry, petalMaterial, petalInstances.length));
     const petalMorphDriver = new THREE.Mesh(petalGeometry, petalMaterial);
+    const presetBase = new THREE.Color(preset.colors.base);
+    petalInstances.forEach(({ plant }, index) => {
+      const target = new THREE.Color(plant.flowerColor);
+      petalMesh.setColorAt(index, new THREE.Color(
+        THREE.MathUtils.clamp(target.r / Math.max(0.025, presetBase.r), 0.18, 3.2),
+        THREE.MathUtils.clamp(target.g / Math.max(0.025, presetBase.g), 0.18, 3.2),
+        THREE.MathUtils.clamp(target.b / Math.max(0.025, presetBase.b), 0.18, 3.2),
+      ));
+    });
+    if (petalMesh.instanceColor) petalMesh.instanceColor.needsUpdate = true;
 
     let sepalMesh: THREE.InstancedMesh | undefined;
     let sepalMorphDriver: THREE.Mesh | undefined;
@@ -451,8 +523,12 @@ export class FlowerField implements Bloomable {
     const lockedAzimuth = plant.headAzimuthDeg * DEG;
     const yaw = THREE.MathUtils.lerp(trackedAzimuth, lockedAzimuth, sunflowerLock);
     const tilt = Math.max(0, plant.headTiltDeg - (batch.preset.kind === 'sunflower' ? (1 - sunflowerLock) * 18 : 0)) * DEG;
-    const verticalPedicel = Math.cos(tilt) * plant.pedicelWorld;
+    const pendantRaceme = batch.preset.kind === 'wisteria';
+    const verticalPedicel = pendantRaceme ? 0 : Math.cos(tilt) * plant.pedicelWorld;
     const stemHeight = Math.max(0.16, plant.visualHeight - verticalPedicel);
+    const supportTilt = plant.supportLeanDeg * DEG;
+    const supportYaw = plant.supportLeanAzimuthDeg * DEG;
+    const supportReach = Math.sin(supportTilt) * stemHeight;
     const windBend = sampleWindBend(time, plant.x, plant.z, plant.windPhase, wind, turbulence);
     const swayX = windBend.x * stemHeight * 0.045;
     const swayZ = windBend.z * stemHeight * 0.039;
@@ -461,22 +537,29 @@ export class FlowerField implements Bloomable {
     const dynamicYaw = yaw + Math.sin(time * 0.00145 + plant.windPhase * 1.37) * wind * turbulence * 0.045;
 
     this.stemStart.set(plant.x, plant.groundY, plant.z);
-    this.stemEnd.set(plant.x + swayX * 0.72, plant.groundY + stemHeight, plant.z + swayZ * 0.72);
+    this.stemEnd.set(
+      plant.x + Math.sin(supportYaw) * supportReach + swayX * 0.72,
+      plant.groundY + Math.cos(supportTilt) * stemHeight,
+      plant.z + Math.cos(supportYaw) * supportReach + swayZ * 0.72,
+    );
     this.direction.set(
-      Math.sin(dynamicYaw) * Math.sin(dynamicTilt),
-      Math.cos(dynamicTilt),
-      Math.cos(dynamicYaw) * Math.sin(dynamicTilt),
+      Math.sin(dynamicYaw) * (pendantRaceme ? 1 : Math.sin(dynamicTilt)),
+      pendantRaceme ? 0 : Math.cos(dynamicTilt),
+      Math.cos(dynamicYaw) * (pendantRaceme ? 1 : Math.sin(dynamicTilt)),
     );
     this.headPosition.copy(this.stemEnd).addScaledVector(this.direction, plant.pedicelWorld);
     this.yawQuaternion.setFromAxisAngle(this.up, dynamicYaw);
-    this.tiltQuaternion.setFromAxisAngle(this.right, dynamicTilt);
+    this.tiltQuaternion.setFromAxisAngle(this.right, pendantRaceme ? 0 : dynamicTilt);
     this.headQuaternion.copy(this.yawQuaternion).multiply(this.tiltQuaternion);
     return stemHeight;
   }
 
   private stemRadius(batch: SpeciesBatch, plant: FieldPlant): number {
     const m = batch.preset.morphology;
-    return m.stemRadius * THREE.MathUtils.clamp(plant.visualHeight / Math.max(0.3, m.stemHeight), 0.38, 2.3);
+    const botanicalRadius = m.stemRadius * THREE.MathUtils.clamp(plant.visualHeight / Math.max(0.3, m.stemHeight), 0.38, 2.3);
+    if (plant.layoutZone === 'tunnel') return Math.min(0.062, botanicalRadius * 0.58);
+    if (plant.layoutZone === 'wall') return Math.min(0.078, botanicalRadius * 0.72);
+    return botanicalRadius;
   }
 
   private setCylinderBetween(
@@ -518,9 +601,21 @@ export class FlowerField implements Bloomable {
 
       this.setHeadMatrix(batch, plant, time, localBloom);
       const reveal = evaluateReproductiveReveal(batch.growth, localBloom);
-      this.transform.position.set(0, batch.preset.kind === 'sunflower' ? 0.04 : batch.preset.id === 'lotus' ? 0.16 : 0.07, 0);
+      this.transform.position.set(
+        0,
+        batch.preset.kind === 'sunflower'
+          ? 0.04
+          : batch.preset.kind === 'hydrangea'
+            ? 0.05
+            : batch.preset.kind === 'wisteria'
+              ? -0.62
+              : batch.preset.id === 'lotus' ? 0.16 : 0.07,
+        0,
+      );
       this.transform.rotation.set(0, 0, 0);
-      const centreReveal = batch.preset.kind === 'sunflower' ? 1 : THREE.MathUtils.lerp(0.42, 1, reveal);
+      const centreReveal = ['sunflower', 'hydrangea', 'wisteria'].includes(batch.preset.kind)
+        ? 1
+        : THREE.MathUtils.lerp(0.42, 1, reveal);
       this.transform.scale.setScalar(centreReveal);
       this.transform.updateMatrix();
       this.workMatrix.multiplyMatrices(this.headMatrix, this.transform.matrix);
@@ -689,6 +784,40 @@ export class FlowerField implements Bloomable {
       ) * this.settings.wind * petalExposure;
       const clearance = smoothstep(0.12, 0.88, deployment);
       const contactSeparation = unfurl?.contactSeparation ?? 0;
+
+      if (spec.inflorescence) {
+        const inflorescence = spec.inflorescence;
+        const clusterSpread = THREE.MathUtils.lerp(0.62, 1, smoothstep(0, batch.growth.swellingEnd, localBloom));
+        this.radial.position.set(
+          inflorescence.originX * clusterSpread,
+          inflorescence.originY * clusterSpread,
+          inflorescence.originZ * clusterSpread,
+        );
+        this.outward.set(inflorescence.normalX, inflorescence.normalY, inflorescence.normalZ).normalize();
+        this.radial.quaternion.setFromUnitVectors(this.forward, this.outward);
+        this.radial.scale.set(1, 1, 1);
+        this.radial.updateMatrix();
+        this.hinge.position.set(0, 0, 0);
+        this.hinge.rotation.set(
+          THREE.MathUtils.lerp(-1.12, 0.04, smoothstep(0.02, 0.96, local)),
+          0,
+          inflorescence.angle + petalFlutter * DEG * 0.12,
+        );
+        this.hinge.scale.set(1, 1, 1);
+        this.hinge.updateMatrix();
+        this.meshPose.position.set(0, 0, 0);
+        this.meshPose.rotation.set(0, Math.sin(subtleTime * 0.47 + spec.phase) * 0.025, 0);
+        const organScale = inflorescence.scale * THREE.MathUtils.lerp(0.74, 1, local);
+        this.meshPose.scale.setScalar(organScale);
+        this.meshPose.updateMatrix();
+        this.workMatrix.multiplyMatrices(this.headMatrix, this.radial.matrix);
+        this.petalMatrix.multiplyMatrices(this.workMatrix, this.hinge.matrix);
+        this.petalMatrix.multiply(this.meshPose.matrix);
+        batch.petalMesh.setMatrixAt(index, this.petalMatrix);
+        batch.petalMorphDriver.morphTargetInfluences![0] = local;
+        batch.petalMesh.setMorphAt(index, batch.petalMorphDriver);
+        return;
+      }
 
       this.radial.position.set(0, 0, 0);
       this.radial.rotation.set(0, spec.angle, 0);
