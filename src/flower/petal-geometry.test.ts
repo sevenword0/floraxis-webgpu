@@ -50,20 +50,41 @@ describe('petal geometry', () => {
         basalEpinasty: 0.94,
         marginGrowth: 0.1,
       },
-      unfurl: { budCurl: 1.02, wave: 0.62, innerCoil: 0.58, layer },
+      unfurl: {
+        budCurl: 1.02,
+        wave: 0.62,
+        innerCoil: 0.58,
+        layer,
+        sideCoil: 1,
+        sideCoilDirection: 1,
+      },
       colors: { base: '#9c1538', tip: '#f46f88' },
     });
     const outer = makeGeometry(0);
     const inner = makeGeometry(1);
     const closed = outer.getAttribute('position');
-    const [released, unfurled, opened] = outer.morphAttributes.position!;
-    const innerOpened = inner.morphAttributes.position![2];
+    const [vortex, released, unfurled, opened] = outer.morphAttributes.position!;
+    const innerOpened = inner.morphAttributes.position![3];
     const tip = 18 * 11 + 5;
     const base = 3 * 11 + 5;
+    const rollRow = 13 * 11;
+    const positiveEdge = rollRow + 10;
+    const negativeEdge = rollRow;
+    const positiveDisplacement = Math.hypot(
+      vortex.getX(positiveEdge) - closed.getX(positiveEdge),
+      vortex.getZ(positiveEdge) - closed.getZ(positiveEdge),
+    );
+    const negativeDisplacement = Math.hypot(
+      vortex.getX(negativeEdge) - closed.getX(negativeEdge),
+      vortex.getZ(negativeEdge) - closed.getZ(negativeEdge),
+    );
 
-    expect(outer.morphAttributes.position).toHaveLength(3);
-    expect(outer.morphAttributes.normal).toHaveLength(3);
-    expect(outer.userData.petalMorphStages).toEqual(['released', 'unfurled', 'open']);
+    expect(outer.morphAttributes.position).toHaveLength(4);
+    expect(outer.morphAttributes.normal).toHaveLength(4);
+    expect(outer.userData.petalMorphStages).toEqual(['vortex', 'released', 'unfurled', 'open']);
+    expect(outer.userData.vortexMorphIndex).toBe(0);
+    expect(outer.userData.unfurlMorphOffset).toBe(1);
+    expect(positiveDisplacement).toBeGreaterThan(negativeDisplacement + 0.08);
     expect(released.getZ(base)).toBeGreaterThan(closed.getZ(base));
     expect(released.getZ(tip)).toBeGreaterThan(closed.getZ(tip));
     expect(unfurled.getZ(tip)).toBeGreaterThan(released.getZ(tip));

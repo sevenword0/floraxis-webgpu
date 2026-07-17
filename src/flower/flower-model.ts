@@ -7,6 +7,7 @@ import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
+import { evaluateRoseVortex } from './rose-vortex';
 import { createLeafGeometry } from './leaf-geometry';
 import {
   generateInflorescencePetalSpecs,
@@ -19,6 +20,13 @@ interface PetalUnfurlMotion {
   layer: number;
   wave: number;
   contactGuard: number;
+}
+
+interface RoseVortexMotion {
+  layer: number;
+  phase: number;
+  strength: number;
+  morphOffset: number;
 }
 
 interface PetalMotion {
@@ -34,6 +42,7 @@ interface PetalMotion {
   growth: number;
   span: number;
   unfurl?: PetalUnfurlMotion;
+  vortex?: RoseVortexMotion;
 }
 
 interface ClearancedPetalMotion extends PetalMotion {
@@ -316,6 +325,8 @@ export class FlowerModel implements Bloomable {
           wave: m.unfurl,
           innerCoil: m.innerCoil,
           layer: inner,
+          sideCoil: this.preset.id === 'rose' ? 1 : 0,
+          sideCoilDirection: 1,
         } : undefined,
         colors,
       }));
@@ -369,6 +380,12 @@ export class FlowerModel implements Bloomable {
             layer: inner,
             wave: m.unfurl,
             contactGuard: petalThickness * 1.8 + petalWidth * 0.01,
+          } : undefined,
+          vortex: this.preset.id === 'rose' ? {
+            layer: inner,
+            phase: index / count,
+            strength: m.innerCoil,
+            morphOffset: 1,
           } : undefined,
           radialBase: clearance.radialBase,
           baseLift: clearance.layerLift,
@@ -714,13 +731,17 @@ export class FlowerModel implements Bloomable {
     for (const petal of this.petals) {
       const local = remapBloom(progress, petal.delay, petal.span);
       const unfurl = petal.unfurl ? evaluatePetalUnfurl(local, petal.unfurl.layer, petal.unfurl.wave) : undefined;
+      const vortex = petal.vortex
+        ? evaluateRoseVortex(local, petal.vortex.layer, petal.vortex.phase, petal.vortex.strength)
+        : undefined;
       const deployment = unfurl?.deployment ?? local;
       const angle = THREE.MathUtils.lerp(petal.closedAngle, petal.openAngle, deployment);
       const livingMotion = Math.sin(subtleTime * 0.52 + petal.phase) * 0.7 * smoothstep(0.78, 1, progress);
       petal.hinge.rotation.x = (angle + livingMotion) * DEG;
       const articulation = unfurl ? unfurl.unfurl * 0.72 + unfurl.reflex * 0.28 : local;
-      petal.hinge.rotation.z = petal.sweep * articulation;
-      petal.mesh.rotation.y = THREE.MathUtils.lerp(petal.closedRoll, petal.roll, articulation);
+      petal.hinge.rotation.z = petal.sweep * articulation + (vortex?.tangentialSweep ?? 0);
+      petal.mesh.rotation.y = THREE.MathUtils.lerp(petal.closedRoll, petal.roll, articulation)
+        + (vortex?.swirlYaw ?? 0);
       const clearance = smoothstep(0.12, 0.88, deployment);
       const contactSeparation = unfurl?.contactSeparation ?? 0;
       const laneDepth = petal.laneDepth * (1 + contactSeparation * 0.45);
@@ -728,13 +749,17 @@ export class FlowerModel implements Bloomable {
       petal.hinge.position.z = petal.radialBase
         + laneDepth
         + petal.openDrift * this.growth.radialSpread * clearance
-        + contactGuard;
+        + contactGuard
+        - (vortex?.radialTuck ?? 0);
       petal.hinge.position.y = petal.baseLift
-        + petal.laneLift * THREE.MathUtils.lerp(0.38, 1 + contactSeparation * 0.26, clearance);
+        + petal.laneLift * THREE.MathUtils.lerp(0.38, 1 + contactSeparation * 0.26, clearance)
+        + (vortex?.lift ?? 0);
       if (unfurl) {
-        petal.mesh.morphTargetInfluences![0] = unfurl.weights[0];
-        petal.mesh.morphTargetInfluences![1] = unfurl.weights[1];
-        petal.mesh.morphTargetInfluences![2] = unfurl.weights[2];
+        const morphOffset = petal.vortex?.morphOffset ?? 0;
+        if (petal.vortex) petal.mesh.morphTargetInfluences![0] = vortex?.sideCoil ?? 0;
+        petal.mesh.morphTargetInfluences![morphOffset] = unfurl.weights[0];
+        petal.mesh.morphTargetInfluences![morphOffset + 1] = unfurl.weights[1];
+        petal.mesh.morphTargetInfluences![morphOffset + 2] = unfurl.weights[2];
       } else {
         petal.mesh.morphTargetInfluences![0] = local;
       }

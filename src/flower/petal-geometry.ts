@@ -36,6 +36,10 @@ export interface PetalUnfurlGeometryOptions {
   innerCoil: number;
   /** Normalized layer position, where zero is outermost and one is innermost. */
   layer: number;
+  /** Unit-strength one-sided longitudinal roll used by tightly packed rose centres. */
+  sideCoil?: number;
+  /** Shared roll chirality. Positive rolls the petal's positive-u margin inward. */
+  sideCoilDirection?: -1 | 1;
 }
 
 type PetalPose = 'closed' | 'released' | 'unfurled' | 'open';
@@ -67,6 +71,7 @@ const buildPositions = (
   pose: PetalPose,
   widthSegments: number,
   lengthSegments: number,
+  sideCoilStrength = 0,
 ): Float32Array => {
   const positions = new Float32Array((widthSegments + 1) * (lengthSegments + 1) * 3);
   const phase = options.seed * 1.61803398875;
@@ -105,7 +110,7 @@ const buildPositions = (
         v,
       );
       const expansion = THREE.MathUtils.lerp(closedWidth, 1, widthProgress);
-      const x = u * options.width * 0.5 * profile * expansion;
+      let x = u * options.width * 0.5 * profile * expansion;
       const tipMask = THREE.MathUtils.smoothstep(v, 0.72, 1);
       const notch = options.notch * options.length * Math.exp(-u * u * 16) * tipMask;
       const roundedShape = options.shape === 'round' || options.shape === 'spoon' || options.shape === 'notched';
@@ -184,6 +189,26 @@ const buildPositions = (
           const residualCoil = -options.length * innerRetention * distalMask * 0.26;
           z = transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge + residualCoil;
         }
+      }
+
+      if (advanced && sideCoilStrength > 0.001) {
+        const direction = advanced.sideCoilDirection ?? 1;
+        const selectedSide = THREE.MathUtils.smoothstep(direction * u, 0.02, 0.98);
+        const longitudinal = Math.pow(THREE.MathUtils.smoothstep(v, 0.1, 0.9), 0.82);
+        const halfWidth = options.width * 0.5 * profile * expansion;
+        const axisX = direction * halfWidth * 0.045;
+        const offsetX = x - axisX;
+        const rollAngle = THREE.MathUtils.clamp(sideCoilStrength, 0, 1.25)
+          * selectedSide
+          * longitudinal
+          * (0.64 + v * 0.36)
+          * Math.PI
+          * 0.78;
+        const cosRoll = Math.cos(rollAngle);
+        const sinRoll = Math.sin(rollAngle);
+        x = axisX + offsetX * cosRoll;
+        z -= Math.abs(offsetX) * sinRoll;
+        y -= Math.abs(offsetX) * (1 - cosRoll) * (0.035 + v * 0.045);
       }
 
       positions[ptr++] = x;
@@ -284,7 +309,15 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   const lengthSegments = Math.round(THREE.MathUtils.clamp(options.segments?.length ?? 18, 5, 30));
   const closedSurface = buildPositions(options, 'closed', widthSegments, lengthSegments);
   const targetPoses: PetalPose[] = options.unfurl ? ['released', 'unfurled', 'open'] : ['open'];
-  const targetSurfaces = targetPoses.map((pose) => buildPositions(options, pose, widthSegments, lengthSegments));
+  const sideCoil = THREE.MathUtils.clamp(options.unfurl?.sideCoil ?? 0, 0, 1.25);
+  const vortexSurface = sideCoil > 0.001
+    ? buildPositions(options, 'closed', widthSegments, lengthSegments, sideCoil)
+    : undefined;
+  const targetSurfaces = [
+    ...(vortexSurface ? [vortexSurface] : []),
+    ...targetPoses.map((pose) => buildPositions(options, pose, widthSegments, lengthSegments)),
+  ];
+  const targetNames = [...(vortexSurface ? ['vortex'] : []), ...targetPoses];
   const surfaceIndices = buildSurfaceIndices(widthSegments, lengthSegments);
   const closedSurfaceNormals = computeNormals(closedSurface, surfaceIndices);
   const targetSurfaceNormals = targetSurfaces.map((surface) => computeNormals(surface, surfaceIndices));
@@ -331,7 +364,9 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.userData.closedPetalLength = options.growth?.closedPetalLength ?? DEFAULT_GROWTH_PROFILE.closedPetalLength;
   geometry.userData.closedPetalWidth = options.growth?.closedPetalWidth ?? DEFAULT_GROWTH_PROFILE.closedPetalWidth;
   geometry.userData.petalFold = options.fold ?? 0;
-  geometry.userData.petalMorphStages = targetPoses;
+  geometry.userData.petalMorphStages = targetNames;
+  geometry.userData.vortexMorphIndex = vortexSurface ? 0 : -1;
+  geometry.userData.unfurlMorphOffset = vortexSurface ? 1 : 0;
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
