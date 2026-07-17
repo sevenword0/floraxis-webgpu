@@ -1,4 +1,4 @@
-import type { FieldSettings, FlowerPreset, IndividualFlowerSettings } from '../types';
+import type { FieldSettings, FlowerPreset, HeightReference, IndividualFlowerSettings } from '../types';
 import { resolveBotanicalArchitecture, sanitizeIndividualFlowerSettings } from '../data/botanical-architecture';
 import { clamp01, seededRandom } from '../utils';
 import { sampleTerrainHeight } from './field-environment-layout';
@@ -12,6 +12,7 @@ export interface FieldPlant {
   presetId: string;
   x: number;
   z: number;
+  /** Vertical datum: terrain for terrestrial species, waterline for lotus. */
   groundY: number;
   /** Retained for compatibility with renderer diagnostics; real-unit fields drive the model. */
   scale: number;
@@ -21,6 +22,7 @@ export interface FieldPlant {
   windPhase: number;
   lod: FieldLod;
   heightCm: number;
+  heightReference: HeightReference;
   flowerDiameterCm: number;
   visualHeight: number;
   visualFlowerDiameter: number;
@@ -46,6 +48,7 @@ export interface IndividualFlowerExport {
   version: 1;
   sourceIndex: number;
   presetId: string;
+  heightReference: HeightReference;
   settings: Required<IndividualFlowerSettings>;
 }
 
@@ -190,6 +193,7 @@ const resolvePlantValues = (
     scale: 1,
     stemScale: safeOverride?.stemScale ?? speciesStemScale,
     heightCm,
+    heightReference: architecture.heightReference,
     flowerDiameterCm,
     visualHeight,
     visualFlowerDiameter,
@@ -410,6 +414,7 @@ export const exportIndividualFlower = (plant: FieldPlant): IndividualFlowerExpor
   version: 1,
   sourceIndex: plant.index,
   presetId: plant.presetId,
+  heightReference: plant.heightReference,
   settings: {
     presetId: plant.presetId,
     heightCm: Number(plant.heightCm.toFixed(2)),

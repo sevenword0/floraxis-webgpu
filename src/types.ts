@@ -83,6 +83,7 @@ export interface BloomGrowthProfile {
 }
 
 export type HeadFacing = 'upward' | 'outward' | 'drooping';
+export type HeightReference = 'root-zone' | 'water-surface';
 
 export type StemHabit = 'shrub' | 'scape' | 'erect-leafy' | 'woody-branch' | 'aquatic-scape' | 'upright' | 'climbing-vine';
 
@@ -98,7 +99,9 @@ export type LeafArrangement = 'alternate' | 'opposite' | 'basal' | 'whorled' | '
 
 /** Measured plant architecture used by the whole-plant and field renderers. */
 export interface BotanicalArchitecture {
-  /** Typical whole-plant height interval in centimetres. */
+  /** Datum used for height measurements and the rendered stem origin. */
+  heightReference: HeightReference;
+  /** Typical height interval in centimetres, measured from heightReference. */
   heightRangeCm: [number, number];
   defaultHeightCm: number;
   /** Fully open flower/head diameter interval in centimetres. */

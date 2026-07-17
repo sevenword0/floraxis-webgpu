@@ -49,6 +49,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['4층 · 42개 꽃잎', '바깥층 우선 개방', '기부 비대칭 성장', '다수 수술'],
     kind: 'radial',
     architecture: {
+      heightReference: 'root-zone',
       heightRangeCm: [150, 250],
       defaultHeightCm: 200,
       flowerDiameterRangeCm: [5, 8],
@@ -104,6 +105,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['2윤생 · 6개 화피', '3+3 방사 대칭', '온도 감응 개폐', '6개 수술'],
     kind: 'radial',
     architecture: {
+      heightReference: 'root-zone',
       heightRangeCm: [10, 50],
       defaultHeightCm: 38,
       flowerDiameterRangeCm: [6.3, 8.3],
@@ -159,6 +161,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['2윤생 · 6개 화피', '강한 중륵', '끝단 후굴', '긴 6개 수술'],
     kind: 'radial',
     architecture: {
+      heightReference: 'root-zone',
       heightRangeCm: [90, 150],
       defaultHeightCm: 110,
       flowerDiameterRangeCm: [12.7, 15.2],
@@ -215,6 +218,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['5개 꽃잎 · 5개 꽃받침', '끝단 오목 형태', '컵 모양 화탁', '15–80개 수술'],
     kind: 'radial',
     architecture: {
+      heightReference: 'root-zone',
       heightRangeCm: [914, 1219],
       defaultHeightCm: 1065,
       flowerDiameterRangeCm: [3, 4.5],
@@ -270,6 +274,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['3층 · 24개 화피', '나선형 기관 배치', '다수 수술', '확대된 원뿔형 화탁'],
     kind: 'radial',
     architecture: {
+      heightReference: 'water-surface',
       heightRangeCm: [91, 183],
       defaultHeightCm: 137,
       flowerDiameterRangeCm: [20, 30],
@@ -286,7 +291,7 @@ export const PRESETS: FlowerPreset[] = [
       leafCount: 2,
       leafLengthCm: 60,
       leafWidthCm: 60,
-      notes: ['수면 위로 곧게 올라오는 독립 꽃자루', '잎자루가 중앙에 붙는 방패형 원형잎'],
+      notes: ['높이는 수중 근경·수심을 제외하고 수면에서 꽃머리까지 측정', '수면 위로 곧게 올라오는 독립 꽃자루', '잎자루가 중앙에 붙는 방패형 원형잎'],
     },
     colors: { base: '#e88da6', tip: '#fff1ed', reverse: '#ca6f8e', center: '#e7b947', pollen: '#f7d36b', stem: '#47715a' },
     morphology: morph({ petalCount: 24, layers: 3, petalLength: 1.38, petalWidth: 0.64, petalShape: 'pointed', taper: 0.5, waviness: 0.025, cup: 0.38, curl: 0.3, fold: 0.24, twist: 5, openAngle: 82, closedAngle: 5, spiral: 0.34, layerScale: 0.13, stamens: 54, stamenLength: 0.48, sepalCount: 2, sepalLength: 0.72, stemHeight: 2.25, stemRadius: 0.095, headRadius: 0.26, bloomDuration: 13, stagger: 0.38, roughness: 0.6, sssStrength: 0.84 }),
@@ -313,6 +318,7 @@ export const PRESETS: FlowerPreset[] = [
       { label: 'American Journal of Botany · petal structural changes', url: 'https://doi.org/10.1002/ajb2.16433' },
       { label: 'Plant Molecular Biology · five lotus flowering stages', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC7246644/' },
       { label: 'Missouri Botanical Garden · sacred lotus dimensions', url: 'https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?hf=3&isprofile=0&taxonid=282911' },
+      { label: 'USGS · lotus organs held above the water surface', url: 'https://nas.er.usgs.gov/queries/FactSheet.aspx?SpeciesID=244' },
     ],
   },
   {
@@ -326,6 +332,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['56개 설상화', '480개 통상화', '황금각 나선', '구심적 개화'],
     kind: 'sunflower',
     architecture: {
+      heightReference: 'root-zone',
       heightRangeCm: [91, 305],
       defaultHeightCm: 198,
       flowerDiameterRangeCm: [7.6, 15.2],
@@ -382,6 +389,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['24개 가시 소화', '소화당 4개 꽃받침조각', '장식화·가임화 혼재', '둥근 취산화서'],
     kind: 'hydrangea',
     architecture: {
+      heightReference: 'root-zone',
       heightRangeCm: [100, 150],
       defaultHeightCm: 120,
       flowerDiameterRangeCm: [7.5, 15],
@@ -438,6 +446,7 @@ export const PRESETS: FlowerPreset[] = [
     structure: ['18개 나비형 소화', '소화당 5개 꽃잎', '무분지 하수 중심축', '부착부→끝 개화 파동'],
     kind: 'wisteria',
     architecture: {
+      heightReference: 'root-zone',
       heightRangeCm: [800, 1200],
       defaultHeightCm: 900,
       flowerDiameterRangeCm: [25, 35],

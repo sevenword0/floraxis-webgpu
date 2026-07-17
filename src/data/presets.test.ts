@@ -26,6 +26,7 @@ describe('botanical presets', () => {
       expect(preset.growth!.observations.length).toBeGreaterThanOrEqual(2);
       expect(preset.growth!.mappingNote.length).toBeGreaterThan(12);
       const architecture = resolveBotanicalArchitecture(preset);
+      expect(['root-zone', 'water-surface']).toContain(architecture.heightReference);
       expect(architecture.defaultHeightCm).toBeGreaterThanOrEqual(architecture.heightRangeCm[0]);
       expect(architecture.defaultHeightCm).toBeLessThanOrEqual(architecture.heightRangeCm[1]);
       expect(architecture.defaultFlowerDiameterCm).toBeGreaterThanOrEqual(architecture.flowerDiameterRangeCm[0]);
@@ -45,6 +46,15 @@ describe('botanical presets', () => {
     expect(wisteria?.kind).toBe('wisteria');
     expect(wisteria?.architecture?.stemHabit).toBe('climbing-vine');
     expect(wisteria?.structure.some((item) => item.includes('하수'))).toBe(true);
+  });
+
+  it('measures lotus height from the water surface', () => {
+    const lotus = PRESETS.find((preset) => preset.id === 'lotus')!;
+    const architecture = resolveBotanicalArchitecture(lotus);
+    expect(architecture.heightReference).toBe('water-surface');
+    expect(architecture.heightRangeCm).toEqual([91, 183]);
+    expect(architecture.notes.some((note) => note.includes('수면'))).toBe(true);
+    expect(lotus.sources.some((source) => source.url.includes('usgs.gov'))).toBe(true);
   });
 
   it('keeps sunflower disc florets as a composite head', () => {

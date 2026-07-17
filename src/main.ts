@@ -281,7 +281,8 @@ const updateFieldColorUI = (): void => {
   updateRangeVisual(flowerSizeVariation);
   qs<HTMLOutputElement>('#field-flower-size-variation-output').value = `${Math.round(variation.flowerSize * 100)}%`;
   const architecture = resolveBotanicalArchitecture(preset);
-  qs<HTMLElement>('#field-variation-note').textContent = `100%에서 높이 ${architecture.heightRangeCm[0]}–${architecture.heightRangeCm[1]}cm · 꽃/꽃차례 ${architecture.flowerDiameterRangeCm[0]}–${architecture.flowerDiameterRangeCm[1]}cm 범위를 시드로 재현합니다.`;
+  const heightLabel = architecture.heightReference === 'water-surface' ? '수면 위 높이' : '높이';
+  qs<HTMLElement>('#field-variation-note').textContent = `100%에서 ${heightLabel} ${architecture.heightRangeCm[0]}–${architecture.heightRangeCm[1]}cm · 꽃/꽃차례 ${architecture.flowerDiameterRangeCm[0]}–${architecture.flowerDiameterRangeCm[1]}cm 범위를 시드로 재현합니다.`;
 };
 
 const renderStageControls = (): void => {
@@ -366,6 +367,9 @@ const updateIndividualFlowerUI = (): void => {
   qs<HTMLElement>('#individual-facing').textContent = `${HEAD_FACING_LABEL[architecture.headFacing]} · ${Math.round(plant.headTiltDeg)}°`;
   qs<HTMLElement>('#individual-habit').textContent = STEM_HABIT_LABEL[architecture.stemHabit];
   qs<HTMLElement>('#individual-leaf-shape').textContent = LEAF_SHAPE_LABEL[architecture.leafShape];
+  qs<HTMLElement>('#individual-height-label').textContent = architecture.heightReference === 'water-surface'
+    ? '수면 위 높이'
+    : '실제 높이';
   qs<HTMLElement>('#individual-structure-note').textContent = architecture.notes.join(' · ');
 
   qsa<HTMLInputElement>('[data-individual]').forEach((input) => {
@@ -521,7 +525,7 @@ const updateResearchUI = (): void => {
     ['꽃잎 길이', `${Math.round(growth.closedPetalLength * 100)} → 100%`],
     ['꽃잎 너비', `${Math.round(growth.closedPetalWidth * 100)} → 100%`],
     ['기관 배치', growth.arrangement],
-    ['실제 높이', `${architecture.heightRangeCm[0]}–${architecture.heightRangeCm[1]} cm`],
+    [architecture.heightReference === 'water-surface' ? '수면 위 높이' : '실제 높이', `${architecture.heightRangeCm[0]}–${architecture.heightRangeCm[1]} cm`],
     ['꽃 지름', `${architecture.flowerDiameterRangeCm[0]}–${architecture.flowerDiameterRangeCm[1]} cm`],
     ['화두 방향', `${HEAD_FACING_LABEL[architecture.headFacing]} · ${architecture.headTiltDeg}°`],
     ['잎·줄기', `${LEAF_SHAPE_LABEL[architecture.leafShape]} · ${STEM_HABIT_LABEL[architecture.stemHabit]}`],

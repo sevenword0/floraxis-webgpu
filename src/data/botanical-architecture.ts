@@ -10,6 +10,7 @@ import type {
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 export const FALLBACK_ARCHITECTURE: BotanicalArchitecture = {
+  heightReference: 'root-zone',
   heightRangeCm: [35, 180],
   defaultHeightCm: 110,
   flowerDiameterRangeCm: [5, 18],

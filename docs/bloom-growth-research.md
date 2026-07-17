@@ -87,7 +87,7 @@ Wisteria floribunda는 꽃자루가 달린 소화가 길고 무분지인 중심�
 
 ## 실제 치수·꽃 방향·영양기관 구조
 
-꽃밭 모드의 개별 꽃 값은 cm 단위 원자료 범위 안에서 생성한다. 한 장면에 10 m급 교목과 수십 cm 초본을 함께 놓을 수 있도록 초본 높이는 비례 축척을 유지하고 320 cm를 넘는 교목만 로그 압축한다. 등나무의 8–12 m 값은 수직 줄기 높이가 아니라 덩굴 길이이므로, 원자료는 보존하되 화면의 꽃차례 부착 높이는 정원 지지대 높이로 제한한다. 꽃 지름은 기관을 식별할 수 있도록 2배 세부 확대하지만, 편집·내보내기·충돌 판정에는 확대 전 실측값을 보존한다.
+꽃밭 모드의 개별 꽃 값은 cm 단위 원자료 범위 안에서 생성한다. 한 장면에 10 m급 교목과 수십 cm 초본을 함께 놓을 수 있도록 초본 높이는 비례 축척을 유지하고 320 cm를 넘는 교목만 로그 압축한다. 연꽃은 수중 근경과 수심을 높이에 더하지 않고 수면을 0점으로 삼아 꽃머리까지 솟은 높이를 저장한다. 등나무의 8–12 m 값은 수직 줄기 높이가 아니라 덩굴 길이이므로, 원자료는 보존하되 화면의 꽃차례 부착 높이는 정원 지지대 높이로 제한한다. 꽃 지름은 기관을 식별할 수 있도록 2배 세부 확대하지만, 편집·내보내기·충돌 판정에는 확대 전 실측값을 보존한다.
 
 | 종 | 적용한 실제 범위 | 기본 꽃머리 방향 | 줄기·수형·잎 대응 |
 | --- | --- | --- | --- |
@@ -95,7 +95,7 @@ Wisteria floribunda는 꽃자루가 달린 소화가 길고 무분지인 중심�
 | 아펠도른 튤립 | 높이 10–50 cm, 꽃 지름 6.3–8.3 cm | 상향 | 분지 없는 단일 꽃대, 기부의 넓은 피침형 잎 |
 | 오리엔탈 백합 | 높이 90–150 cm, 꽃 지름 12.7–15.2 cm | 반직립–수평 측향 | 직립 유엽 줄기, 긴 꽃자루, 윤생·호생 피침형 잎 |
 | 왕벚나무 | 높이 914–1219 cm | 가지 끝 측향 | 넓고 열린 교목 수관, 3–6송이 총상화서, 톱니 타원형 잎 |
-| 연꽃 | 높이 91–183 cm, 꽃 지름 20–30 cm | 상향 | 수중 근경에서 올라오는 꽃대, 별도 엽병의 방패형 원형 잎 |
+| 연꽃 | 수면 위 꽃 높이 91–183 cm, 꽃 지름 20–30 cm | 상향 | 수중 근경·수심은 높이에서 제외, 별도 엽병의 방패형 원형 잎 |
 | 해바라기 | 높이 91–305 cm, 머리 지름 7.6–15.2 cm | 개화 시 동향·준수평 | 굵은 직립 줄기, 난형·삼각형 톱니 잎 |
 | 큰잎수국 | 높이 100–150 cm, 화서 지름 7.5–15 cm | 상향 돔 | 분지 관목, 마주나는 넓은 난형 톱니 잎 |
 | 등나무 | 덩굴 높이 8–12 m, 꽃차례 약 25–35 cm | 수직 하향 | 목질 덩굴, 호생 우상복엽, 퍼골라 유인 |
@@ -111,6 +111,8 @@ Wisteria floribunda는 꽃자루가 달린 소화가 길고 무분지인 중심�
 - [Kew Plants of the World Online — Lilium](https://powo.science.kew.org/taxon/urn%3Alsid%3Aipni.org%3Anames%3A30009317-2/general-information)
 - [Missouri Botanical Garden — Prunus × yedoensis](https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?bt=4&taxonid=286608)
 - [Missouri Botanical Garden — Nelumbo nucifera](https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?hf=3&isprofile=0&taxonid=282911)
+- [USGS — Nelumbo nucifera organs above the water surface](https://nas.er.usgs.gov/queries/FactSheet.aspx?SpeciesID=244)
+- [NC State Extension — Nelumbo nucifera flower stalks above water](https://plants.ces.ncsu.edu/plants/nelumbo-nucifera/)
 - [Missouri Botanical Garden — Helianthus annuus](https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?cv=5&isprofile=0&lo=1&taxonid=277199)
 - [Sunflower head orientation and pollinator visits](https://pmc.ncbi.nlm.nih.gov/articles/PMC7725789/)
 - [Dynamics of sunflower head orientation](https://pmc.ncbi.nlm.nih.gov/articles/PMC10168033/)

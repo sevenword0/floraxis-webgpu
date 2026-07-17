@@ -245,6 +245,21 @@ describe('preset flower-field layout', () => {
     expect(new Set(uniform.map((plant) => plant.flowerDiameterCm))).toEqual(new Set([architecture.defaultFlowerDiameterCm]));
   });
 
+  it('uses the water surface as the lotus height datum and preserves it in exports', () => {
+    const lotusField = generateFieldLayout({
+      ...settings,
+      count: 18,
+      speciesIds: ['lotus'],
+      speciesVariations: { lotus: { height: 0, flowerSize: 0 } },
+    }, PRESETS);
+    expect(lotusField.every((plant) => plant.heightReference === 'water-surface')).toBe(true);
+    expect(lotusField.every((plant) => plant.heightCm === 137)).toBe(true);
+    expect(exportIndividualFlower(lotusField[0]).heightReference).toBe('water-surface');
+
+    const roseField = generateFieldLayout({ ...settings, count: 12, speciesIds: ['rose'] }, PRESETS);
+    expect(roseField.every((plant) => plant.heightReference === 'root-zone')).toBe(true);
+  });
+
   it('maps delayed bloom to exact global endpoints', () => {
     expect(evaluateFieldBloom(0, 0.4)).toBe(0);
     expect(evaluateFieldBloom(0.25, 0.4)).toBe(0);
