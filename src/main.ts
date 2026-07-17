@@ -2,7 +2,7 @@ import './style.css';
 import { DEFAULT_PRESET, PRESETS } from './data/presets';
 import { resolveGrowthProfile } from './growth-model';
 import { BloomRenderer } from './render/bloom-renderer';
-import type { AppState, BloomGrowthProfile, FlowerPreset, RenderSettings } from './types';
+import type { AppState, BloomGrowthProfile, FieldSettings, FlowerPreset, RenderSettings, SceneMode } from './types';
 import {
   BLOOM_STAGES,
   clamp01,
@@ -33,7 +33,19 @@ const DEFAULT_RENDER: RenderSettings = {
   quality: 'balanced',
 };
 
+const DEFAULT_FIELD: FieldSettings = {
+  count: 120,
+  radius: 6.5,
+  spacing: 0.52,
+  bloomWave: 0.64,
+  bloomVariance: 0.32,
+  wind: 0.36,
+  seed: 240617,
+  speciesIds: PRESETS.map((preset) => preset.id),
+};
+
 const state: AppState = {
+  mode: 'specimen',
   presetId: DEFAULT_PRESET.id,
   preset: deepClonePreset(DEFAULT_PRESET),
   bloom: 0,
@@ -41,6 +53,7 @@ const state: AppState = {
   direction: 1,
   speed: 1,
   render: { ...DEFAULT_RENDER },
+  field: { ...DEFAULT_FIELD, speciesIds: [...DEFAULT_FIELD.speciesIds] },
 };
 
 const host = qs<HTMLElement>('#render-host');
@@ -58,6 +71,8 @@ let renderer: BloomRenderer | undefined;
 let loopEnabled = true;
 let customPreset: FlowerPreset | undefined;
 let rebuildTimer = 0;
+let fieldRebuildTimer = 0;
+let refocusFieldAfterRebuild = false;
 let lastStatsUpdate = 0;
 
 try {
@@ -82,6 +97,41 @@ const renderPresetCards = (): void => {
       <i class="card-dot" aria-hidden="true"></i>`;
     button.addEventListener('click', () => selectPreset(preset));
     return button;
+  }));
+};
+
+const setFieldSpeciesEnabled = (presetId: string, enabled: boolean): void => {
+  const selected = new Set(state.field.speciesIds);
+  if (enabled) selected.add(presetId);
+  else selected.delete(presetId);
+  if (selected.size === 0) {
+    showToast('꽃밭에는 한 종 이상이 필요합니다.');
+    updateFieldUI();
+    return;
+  }
+  state.field.speciesIds = PRESETS.map((preset) => preset.id).filter((id) => selected.has(id));
+  updateFieldUI();
+  updatePresetUI();
+  scheduleFieldRebuild();
+};
+
+const renderFieldSpeciesControls = (): void => {
+  const host = qs<HTMLElement>('#field-species');
+  host.replaceChildren(...PRESETS.map((preset) => {
+    const label = document.createElement('label');
+    label.className = 'species-chip';
+    label.style.setProperty('--species-color', preset.colors.base);
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = preset.id;
+    input.checked = state.field.speciesIds.includes(preset.id);
+    input.addEventListener('change', () => setFieldSpeciesEnabled(preset.id, input.checked));
+    const dot = document.createElement('i');
+    dot.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = preset.name;
+    label.append(input, dot, text);
+    return label;
   }));
 };
 
@@ -113,6 +163,37 @@ const updateRangeVisual = (input: HTMLInputElement): void => {
   const max = Number(input.max || 100);
   const value = Number(input.value);
   input.style.setProperty('--value', `${(value - min) / (max - min) * 100}%`);
+};
+
+const updateFieldUI = (): void => {
+  qsa<HTMLInputElement>('[data-field]').forEach((input) => {
+    const key = input.dataset.field as Exclude<keyof FieldSettings, 'speciesIds'>;
+    const value = state.field[key];
+    input.value = String(value);
+    updateRangeVisual(input);
+    const output = qs<HTMLOutputElement>(`[data-field-output="${key}"]`);
+    if (key === 'count') output.value = String(Math.round(value));
+    else if (key === 'radius' || key === 'spacing') output.value = `${Number(value.toFixed(2))}m`;
+    else output.value = `${Math.round(value * 100)}%`;
+  });
+  qs<HTMLInputElement>('#field-seed').value = String(state.field.seed);
+  qsa<HTMLInputElement>('#field-species input').forEach((input) => {
+    input.checked = state.field.speciesIds.includes(input.value);
+  });
+  qs<HTMLElement>('#field-summary-count').textContent = String(state.field.count);
+  qs<HTMLElement>('#field-summary-species').textContent = String(state.field.speciesIds.length);
+};
+
+const updateModeUI = (): void => {
+  qsa<HTMLButtonElement>('[data-scene-mode]').forEach((button) => {
+    const active = button.dataset.sceneMode === state.mode;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  qsa<HTMLElement>('.specimen-only').forEach((element) => element.classList.toggle('is-hidden', state.mode !== 'specimen'));
+  qsa<HTMLElement>('.field-only').forEach((element) => element.classList.toggle('is-hidden', state.mode !== 'field'));
+  customCard.disabled = state.mode === 'field';
+  customCard.setAttribute('aria-disabled', String(state.mode === 'field'));
 };
 
 const updateMorphologyUI = (): void => {
@@ -195,7 +276,11 @@ const updatePresetUI = (): void => {
     return tag;
   }));
   qsa<HTMLButtonElement>('[data-preset]').forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.preset === state.presetId);
+    const active = state.mode === 'field'
+      ? state.field.speciesIds.includes(button.dataset.preset ?? '')
+      : button.dataset.preset === state.presetId;
+    button.classList.toggle('is-active', active);
+    if (button.dataset.preset !== 'custom') button.setAttribute('aria-pressed', String(active));
   });
   setAccent(state.preset.colors.base);
   updateMorphologyUI();
@@ -207,7 +292,7 @@ const updateTimeline = (): void => {
   const stage = getBloomStage(progress);
   bloomRange.value = String(Math.round(progress * 1000));
   document.documentElement.style.setProperty('--timeline-progress', `${progress * 100}%`);
-  qs<HTMLElement>('#stage-label').textContent = stage.label;
+  qs<HTMLElement>('#stage-label').textContent = state.mode === 'field' ? `군락 · ${stage.label}` : stage.label;
   qs<HTMLOutputElement>('#progress-label').value = formatPercent(progress);
   playButton.classList.toggle('is-playing', state.playing);
   playButton.setAttribute('aria-label', state.playing ? '개화 일시 정지' : '개화 재생');
@@ -241,11 +326,49 @@ const persistCustom = (): void => {
 };
 
 const scheduleFlowerRebuild = (): void => {
+  if (state.mode !== 'specimen') return;
   window.clearTimeout(rebuildTimer);
   rebuildTimer = window.setTimeout(() => renderer?.setFlower(state.preset), 90);
 };
 
+const scheduleFieldRebuild = (refocus = false): void => {
+  if (state.mode !== 'field') return;
+  refocusFieldAfterRebuild ||= refocus;
+  window.clearTimeout(fieldRebuildTimer);
+  fieldRebuildTimer = window.setTimeout(() => {
+    renderer?.setField(state.field, PRESETS);
+    renderer?.setBloom(state.bloom);
+    if (refocusFieldAfterRebuild) renderer?.focusField(state.field.radius);
+    refocusFieldAfterRebuild = false;
+  }, 110);
+};
+
+const setSceneMode = (mode: SceneMode): void => {
+  if (state.mode === mode) return;
+  state.mode = mode;
+  window.clearTimeout(rebuildTimer);
+  window.clearTimeout(fieldRebuildTimer);
+  if (mode === 'field') {
+    renderer?.setField(state.field, PRESETS);
+    renderer?.setBloom(state.bloom);
+  } else {
+    renderer?.setFlower(state.preset);
+    renderer?.setBloom(state.bloom);
+    renderer?.focusFlower();
+  }
+  updateModeUI();
+  updatePresetUI();
+  updateTimeline();
+  closeMobilePanels();
+  showToast(mode === 'field' ? '프리셋 꽃밭 모드로 전환했습니다.' : '한 송이 관찰 모드로 전환했습니다.');
+};
+
 function selectPreset(preset: FlowerPreset): void {
+  if (state.mode === 'field') {
+    const enabled = state.field.speciesIds.includes(preset.id);
+    setFieldSpeciesEnabled(preset.id, !enabled);
+    return;
+  }
   state.presetId = preset.id;
   state.preset = deepClonePreset(preset);
   state.bloom = Math.min(state.bloom, 0.82);
@@ -381,6 +504,32 @@ const openResearch = (): void => {
 };
 
 const wireEvents = (): void => {
+  qsa<HTMLButtonElement>('[data-scene-mode]').forEach((button) => {
+    button.addEventListener('click', () => setSceneMode(button.dataset.sceneMode as SceneMode));
+  });
+
+  qsa<HTMLInputElement>('[data-field]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const key = input.dataset.field as Exclude<keyof FieldSettings, 'speciesIds'>;
+      const nextValue = key === 'count' ? Math.round(Number(input.value)) : Number(input.value);
+      (state.field as unknown as Record<string, number>)[key] = nextValue;
+      updateFieldUI();
+      scheduleFieldRebuild(key === 'radius');
+    });
+  });
+  qs<HTMLInputElement>('#field-seed').addEventListener('change', (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    state.field.seed = Math.min(999999, Math.max(1, Math.round(Number(input.value) || DEFAULT_FIELD.seed)));
+    updateFieldUI();
+    scheduleFieldRebuild();
+  });
+  qs<HTMLButtonElement>('#field-regenerate').addEventListener('click', () => {
+    state.field.seed = Math.floor(1 + Math.random() * 999998);
+    updateFieldUI();
+    scheduleFieldRebuild();
+    showToast(`새 배치 시드 ${state.field.seed}를 적용했습니다.`);
+  });
+
   customCard.addEventListener('click', () => {
     if (customPreset) {
       state.presetId = 'custom';
@@ -476,7 +625,7 @@ const wireEvents = (): void => {
   qs<HTMLButtonElement>('#mobile-research').addEventListener('click', openResearch);
   qs<HTMLButtonElement>('#research-close').addEventListener('click', () => researchDialog.close());
   researchDialog.addEventListener('click', (event) => { if (event.target === researchDialog) researchDialog.close(); });
-  qs<HTMLButtonElement>('#camera-reset').addEventListener('click', () => renderer?.focusFlower());
+  qs<HTMLButtonElement>('#camera-reset').addEventListener('click', () => renderer?.focusScene());
   qs<HTMLButtonElement>('#capture').addEventListener('click', () => { renderer?.capture(); showToast('고해상도 프레임을 캡처했습니다.'); });
   qs<HTMLButtonElement>('#randomize').addEventListener('click', randomizeCustom);
   qs<HTMLButtonElement>('#export-preset').addEventListener('click', exportCustom);
@@ -497,7 +646,7 @@ const wireEvents = (): void => {
       event.preventDefault();
       playButton.click();
     } else if (event.key.toLowerCase() === 'r') {
-      renderer?.focusFlower();
+      renderer?.focusScene();
     } else if (/^[1-6]$/.test(event.key)) {
       selectPreset(PRESETS[Number(event.key) - 1]);
     } else if (event.key === 'Escape') {
@@ -509,7 +658,8 @@ const wireEvents = (): void => {
 
 const onFrame = (delta: number, elapsedMs: number, info: { fps: number; drawCalls: number; triangles: number }): void => {
   if (state.playing) {
-    const deltaBloom = delta * state.speed / Math.max(2, state.preset.morphology.bloomDuration);
+    const bloomDuration = state.mode === 'field' ? 18 : state.preset.morphology.bloomDuration;
+    const deltaBloom = delta * state.speed / Math.max(2, bloomDuration);
     state.bloom += deltaBloom * state.direction;
     if (state.bloom >= 1) {
       state.bloom = 1;
@@ -531,9 +681,12 @@ const onFrame = (delta: number, elapsedMs: number, info: { fps: number; drawCall
 
 const init = async (): Promise<void> => {
   renderPresetCards();
+  renderFieldSpeciesControls();
   renderStageControls();
   wireEvents();
+  updateModeUI();
   updatePresetUI();
+  updateFieldUI();
   updateTimeline();
   updateRenderUI();
 

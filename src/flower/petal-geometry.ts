@@ -22,6 +22,8 @@ export interface PetalGeometryOptions {
   thickness?: number;
   growth?: PetalGrowthGeometry;
   unfurl?: PetalUnfurlGeometryOptions;
+  /** Optional reduced tessellation for distant instanced flower-field petals. */
+  segments?: { width: number; length: number };
   colors: Pick<FlowerColors, 'base' | 'tip'>;
 }
 
@@ -278,8 +280,8 @@ const computeNormals = (positions: Float32Array, indices: number[]): Float32Arra
 export const resolvePetalThickness = (length: number): number => THREE.MathUtils.clamp(length * 0.014, 0.009, 0.026);
 
 export const createPetalGeometry = (options: PetalGeometryOptions): THREE.BufferGeometry => {
-  const widthSegments = 10;
-  const lengthSegments = 18;
+  const widthSegments = Math.round(THREE.MathUtils.clamp(options.segments?.width ?? 10, 3, 18));
+  const lengthSegments = Math.round(THREE.MathUtils.clamp(options.segments?.length ?? 18, 5, 30));
   const closedSurface = buildPositions(options, 'closed', widthSegments, lengthSegments);
   const targetPoses: PetalPose[] = options.unfurl ? ['released', 'unfurled', 'open'] : ['open'];
   const targetSurfaces = targetPoses.map((pose) => buildPositions(options, pose, widthSegments, lengthSegments));

@@ -110,7 +110,29 @@ export interface RenderSettings {
   quality: 'balanced' | 'cinematic';
 }
 
+export type SceneMode = 'specimen' | 'field';
+
+export interface FieldSettings {
+  /** Number of individual flowering plants in the field. */
+  count: number;
+  /** Circular planting radius in world-space metres. */
+  radius: number;
+  /** Minimum centre-to-centre spacing requested by the deterministic layout. */
+  spacing: number;
+  /** Strength of the left-to-right bloom delay wave. */
+  bloomWave: number;
+  /** Per-plant deterministic bloom-time variation. */
+  bloomVariance: number;
+  /** Wind sway strength shared by stems and flower heads. */
+  wind: number;
+  /** Deterministic seed used for placement, species assignment, and motion phases. */
+  seed: number;
+  /** Presets participating in the field mixture. */
+  speciesIds: string[];
+}
+
 export interface AppState {
+  mode: SceneMode;
   presetId: string;
   preset: FlowerPreset;
   bloom: number;
@@ -118,6 +140,7 @@ export interface AppState {
   direction: 1 | -1;
   speed: number;
   render: RenderSettings;
+  field: FieldSettings;
 }
 
 export interface BloomStage {

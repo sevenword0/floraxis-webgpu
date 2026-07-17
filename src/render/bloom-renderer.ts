@@ -27,8 +27,9 @@ import { ssgi } from 'three/addons/tsl/display/SSGINode.js';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { sss } from 'three/addons/tsl/display/SSSNode.js';
 import { boxBlur } from 'three/addons/tsl/display/boxBlur.js';
-import type { FlowerPreset, RenderSettings } from '../types';
+import type { Bloomable, FieldSettings, FlowerPreset, RenderSettings, SceneMode } from '../types';
 import { FlowerModel } from '../flower/flower-model';
+import { FlowerField } from '../flower/flower-field';
 
 export interface RendererFrameInfo {
   fps: number;
@@ -88,7 +89,11 @@ export class BloomRenderer {
   private readonly rimLight = new THREE.PointLight(0xff8fbd, 16, 10, 2);
   private controls!: OrbitControls;
   private pipeline!: THREE.RenderPipeline;
-  private flower?: FlowerModel;
+  private subject?: Bloomable;
+  private sceneMode: SceneMode = 'specimen';
+  private fieldRadius = 6.5;
+  private readonly specimenStage = new THREE.Group();
+  private fieldGround?: THREE.Mesh;
   private bloomProgress = 0;
   private settings!: RenderSettings;
   private width = 1;
@@ -188,15 +193,29 @@ export class BloomRenderer {
     const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.55, 0.14, 96), pedestalMaterial);
     pedestal.position.y = -0.09;
     pedestal.receiveShadow = true;
-    this.scene.add(pedestal);
+    this.specimenStage.add(pedestal);
 
     const ringMaterial = new THREE.MeshStandardNodeMaterial({ color: 0x65847b, metalness: 0.85, roughness: 0.28 });
     [1.12, 2.1, 3.02].forEach((radius) => {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.006, 4, 128), ringMaterial);
       ring.rotation.x = Math.PI * 0.5;
       ring.position.y = -0.014;
-      this.scene.add(ring);
+      this.specimenStage.add(ring);
     });
+    this.scene.add(this.specimenStage);
+
+    const fieldMaterial = new THREE.MeshPhysicalNodeMaterial({
+      color: 0x172620,
+      metalness: 0.08,
+      roughness: 0.78,
+      clearcoat: 0.22,
+      clearcoatRoughness: 0.74,
+    });
+    this.fieldGround = new THREE.Mesh(new THREE.CylinderGeometry(10.8, 11, 0.12, 112), fieldMaterial);
+    this.fieldGround.position.y = -0.12;
+    this.fieldGround.receiveShadow = true;
+    this.fieldGround.visible = false;
+    this.scene.add(this.fieldGround);
   }
 
   private async setupEnvironment(): Promise<void> {
@@ -295,10 +314,22 @@ export class BloomRenderer {
   }
 
   setFlower(preset: FlowerPreset): void {
-    this.flower?.dispose();
-    this.flower = new FlowerModel(preset);
-    this.scene.add(this.flower.root);
-    this.flower.update(this.bloomProgress, performance.now());
+    this.subject?.dispose();
+    this.subject = new FlowerModel(preset);
+    this.scene.add(this.subject.root);
+    this.subject.update(this.bloomProgress, performance.now());
+    this.setSceneMode('specimen');
+  }
+
+  setField(settings: FieldSettings, presets: FlowerPreset[]): void {
+    const changedMode = this.sceneMode !== 'field';
+    this.fieldRadius = settings.radius;
+    this.subject?.dispose();
+    this.subject = new FlowerField(settings, presets);
+    this.scene.add(this.subject.root);
+    this.subject.update(this.bloomProgress, performance.now());
+    this.setSceneMode('field');
+    if (changedMode) this.focusField(settings.radius);
   }
 
   setBloom(progress: number): void {
@@ -343,7 +374,48 @@ export class BloomRenderer {
     const narrowScale = this.width / Math.max(1, this.height) < 0.72 ? 1.18 : 1;
     this.camera.position.set(4.1 * narrowScale, targetY + (2.9 - targetY) * narrowScale, 5.5 * narrowScale);
     this.controls.target.set(0, targetY, 0);
+    this.controls.minDistance = 2.7;
+    this.controls.maxDistance = 9;
+    this.controls.maxPolarAngle = Math.PI * 0.78;
+    this.setShadowExtent(4.5, 6);
     this.controls.update();
+  }
+
+  focusField(radius: number): void {
+    const safeRadius = Math.min(10, Math.max(2.5, radius));
+    const targetY = 0.72;
+    const narrowScale = this.width / Math.max(1, this.height) < 0.72 ? 1.2 : 1;
+    this.camera.position.set(
+      safeRadius * 1.55 * narrowScale,
+      (safeRadius * 1.15 + 3.8) * narrowScale,
+      safeRadius * 2 * narrowScale,
+    );
+    this.controls.target.set(0, targetY, 0);
+    this.controls.minDistance = 4;
+    this.controls.maxDistance = 30;
+    this.controls.maxPolarAngle = Math.PI * 0.48;
+    this.setShadowExtent(safeRadius + 2.2, safeRadius + 4.5);
+    this.controls.update();
+  }
+
+  focusScene(): void {
+    if (this.sceneMode === 'field') this.focusField(this.fieldRadius);
+    else this.focusFlower();
+  }
+
+  private setSceneMode(mode: SceneMode): void {
+    this.sceneMode = mode;
+    this.specimenStage.visible = mode === 'specimen';
+    if (this.fieldGround) this.fieldGround.visible = mode === 'field';
+  }
+
+  private setShadowExtent(horizontal: number, vertical: number): void {
+    this.keyLight.shadow.camera.left = -horizontal;
+    this.keyLight.shadow.camera.right = horizontal;
+    this.keyLight.shadow.camera.top = vertical;
+    this.keyLight.shadow.camera.bottom = -2;
+    this.keyLight.shadow.camera.far = Math.max(18, vertical * 2.2);
+    this.keyLight.shadow.camera.updateProjectionMatrix();
   }
 
   resize(): void {
@@ -393,14 +465,14 @@ export class BloomRenderer {
       drawCalls: frameCalls,
       triangles: frameTriangles,
     });
-    this.flower?.update(this.bloomProgress, time);
+    this.subject?.update(this.bloomProgress, time);
     this.controls.update();
     this.pipeline.render();
   }
 
   dispose(): void {
     this.renderer.setAnimationLoop(null);
-    this.flower?.dispose();
+    this.subject?.dispose();
     this.controls?.dispose();
     this.pipeline?.dispose();
     this.renderer.dispose();

@@ -46,6 +46,10 @@
 
         <nav class="preset-rail glass-panel" aria-label="꽃 프리셋">
           <div class="panel-kicker"><span>01</span> SPECIES</div>
+          <div class="scene-mode" role="group" aria-label="시뮬레이션 장면">
+            <button type="button" data-scene-mode="specimen" class="is-active" aria-pressed="true">한 송이</button>
+            <button type="button" data-scene-mode="field" aria-pressed="false">프리셋 꽃밭</button>
+          </div>
           <div id="preset-list" class="preset-list"></div>
           <button id="custom-card" class="preset-card preset-card--custom" type="button" data-preset="custom">
             <span class="preset-index">+</span>
@@ -55,7 +59,7 @@
 
         <aside class="inspector glass-panel" id="inspector" aria-label="꽃 형태 및 렌더 설정">
           <div class="inspector-scroll">
-            <section class="specimen-heading">
+            <section class="specimen-heading specimen-only">
               <div class="panel-kicker"><span>02</span> SPECIMEN</div>
               <p id="preset-eyebrow" class="specimen-eyebrow">ASYMMETRIC GROWTH</p>
               <h1 id="preset-name">다마스크 장미</h1>
@@ -64,7 +68,49 @@
               <div id="structure-tags" class="structure-tags"></div>
             </section>
 
-            <section class="control-section" aria-labelledby="morph-title">
+            <section class="field-heading field-only is-hidden" aria-labelledby="field-heading-title">
+              <div class="panel-kicker"><span>02</span> FIELD STUDY</div>
+              <p class="specimen-eyebrow">INSTANCED ECOSYSTEM</p>
+              <h1 id="field-heading-title">프리셋 꽃밭</h1>
+              <p class="description">선택한 꽃들의 개화 시차와 바람 위상을 분산해 한 방향으로 번지는 군락 개화를 관찰합니다.</p>
+              <div class="field-summary" aria-live="polite"><strong id="field-summary-count">120</strong> FLOWERS · <strong id="field-summary-species">6</strong> SPECIES</div>
+            </section>
+
+            <section class="control-section field-only is-hidden" aria-labelledby="field-title">
+              <button class="section-heading" id="field-title" type="button" aria-expanded="true">
+                <span><i>03</i> FIELD COMPOSITION</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
+              </button>
+              <div class="section-body field-controls">
+                <label class="range-field">
+                  <span>꽃 개체 수 <output data-field-output="count">120</output></span>
+                  <input type="range" min="24" max="320" step="8" data-field="count" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>꽃밭 반경 <output data-field-output="radius">6.5m</output></span><input type="range" min="3" max="9" step="0.25" data-field="radius" /></label>
+                  <label class="range-field"><span>최소 간격 <output data-field-output="spacing">0.52m</output></span><input type="range" min="0.18" max="0.9" step="0.01" data-field="spacing" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>개화 파동 <output data-field-output="bloomWave">64%</output></span><input type="range" min="0" max="1" step="0.01" data-field="bloomWave" /></label>
+                  <label class="range-field"><span>개화 편차 <output data-field-output="bloomVariance">32%</output></span><input type="range" min="0" max="1" step="0.01" data-field="bloomVariance" /></label>
+                </div>
+                <label class="range-field">
+                  <span>바람 세기 <output data-field-output="wind">36%</output></span>
+                  <input type="range" min="0" max="1" step="0.01" data-field="wind" />
+                </label>
+                <div>
+                  <span class="field-label">꽃 구성</span>
+                  <div id="field-species" class="species-mix" role="group" aria-label="꽃밭에 포함할 꽃"></div>
+                </div>
+                <div class="seed-row">
+                  <label for="field-seed">배치 시드</label>
+                  <input id="field-seed" type="number" min="1" max="999999" step="1" value="240617" />
+                  <button type="button" id="field-regenerate">새 배치</button>
+                </div>
+                <p class="field-lod-note">가까운 꽃은 세부 꽃잎을 유지하고, 먼 꽃은 꽃잎 수와 메시 밀도를 자동으로 줄입니다.</p>
+              </div>
+            </section>
+
+            <section class="control-section specimen-only" aria-labelledby="morph-title">
               <button class="section-heading" id="morph-title" type="button" aria-expanded="true">
                 <span><i>03</i> MORPHOLOGY</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
               </button>
@@ -123,7 +169,7 @@
               </div>
             </section>
 
-            <section class="control-section" aria-labelledby="growth-title">
+            <section class="control-section specimen-only" aria-labelledby="growth-title">
               <button class="section-heading" id="growth-title" type="button" aria-expanded="false">
                 <span><i>04</i> GROWTH PROFILE</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
               </button>
