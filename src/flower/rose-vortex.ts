@@ -1,4 +1,5 @@
 import { smoothstep } from '../utils';
+import type { FlowerPreset } from '../types';
 
 export interface RoseVortexState {
   /** Weight of the one-sided geometry roll morph. */
@@ -15,6 +16,25 @@ export interface RoseVortexState {
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const DEG = Math.PI / 180;
+
+/**
+ * Parameter editing turns a built-in preset into `custom`, so rose behaviour
+ * must follow botanical lineage instead of the mutable UI identifier.
+ */
+export const usesRoseVortex = (
+  preset: Pick<FlowerPreset, 'id' | 'kind' | 'morphology'> & { family?: string },
+): boolean => {
+  const family = typeof preset.family === 'string' ? preset.family.trim().toLowerCase() : '';
+  const m = preset.morphology;
+  const legacyCustomRose = preset.id === 'custom'
+    && m.petalShape === 'round'
+    && m.layers >= 3
+    && m.petalCount >= 12
+    && m.unfurl > 0.01
+    && m.innerCoil > 0.01;
+  const roseLineage = preset.id === 'rose' || family.includes('rosaceae') || legacyCustomRose;
+  return roseLineage && preset.kind === 'radial' && preset.morphology.budCurl > 0.01;
+};
 
 /**
  * A clockwise, centre-only rose vortex. Petals farther around the ring retain

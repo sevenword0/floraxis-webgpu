@@ -57,6 +57,7 @@ describe('petal geometry', () => {
         layer,
         sideCoil: 1,
         sideCoilDirection: 1,
+        sideCoilCounterCurve: 0.18,
       },
       colors: { base: '#9c1538', tip: '#f46f88' },
     });
@@ -84,6 +85,8 @@ describe('petal geometry', () => {
     expect(outer.userData.petalMorphStages).toEqual(['vortex', 'released', 'unfurled', 'open']);
     expect(outer.userData.vortexMorphIndex).toBe(0);
     expect(outer.userData.unfurlMorphOffset).toBe(1);
+    expect(outer.userData.sideCoilCounterCurve).toBe(0.18);
+    expect(negativeDisplacement).toBeGreaterThan(0.01);
     expect(positiveDisplacement).toBeGreaterThan(negativeDisplacement + 0.08);
     expect(released.getZ(base)).toBeGreaterThan(closed.getZ(base));
     expect(released.getZ(tip)).toBeGreaterThan(closed.getZ(tip));

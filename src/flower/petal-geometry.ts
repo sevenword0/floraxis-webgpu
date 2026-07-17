@@ -40,6 +40,8 @@ export interface PetalUnfurlGeometryOptions {
   sideCoil?: number;
   /** Shared roll chirality. Positive rolls the petal's positive-u margin inward. */
   sideCoilDirection?: -1 | 1;
+  /** Fraction of the main curvature retained by the opposite petal margin. */
+  sideCoilCounterCurve?: number;
 }
 
 type PetalPose = 'closed' | 'released' | 'unfurled' | 'open';
@@ -193,13 +195,15 @@ const buildPositions = (
 
       if (advanced && sideCoilStrength > 0.001) {
         const direction = advanced.sideCoilDirection ?? 1;
-        const selectedSide = THREE.MathUtils.smoothstep(direction * u, 0.02, 0.98);
+        const activeSide = THREE.MathUtils.smoothstep(direction * u, -0.22, 0.94);
+        const counterCurve = THREE.MathUtils.clamp(advanced.sideCoilCounterCurve ?? 0.18, 0.08, 0.62);
+        const curvatureGain = THREE.MathUtils.lerp(counterCurve, 1, activeSide);
         const longitudinal = Math.pow(THREE.MathUtils.smoothstep(v, 0.1, 0.9), 0.82);
         const halfWidth = options.width * 0.5 * profile * expansion;
         const axisX = direction * halfWidth * 0.045;
         const offsetX = x - axisX;
         const rollAngle = THREE.MathUtils.clamp(sideCoilStrength, 0, 1.25)
-          * selectedSide
+          * curvatureGain
           * longitudinal
           * (0.64 + v * 0.36)
           * Math.PI
@@ -367,6 +371,7 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.userData.petalMorphStages = targetNames;
   geometry.userData.vortexMorphIndex = vortexSurface ? 0 : -1;
   geometry.userData.unfurlMorphOffset = vortexSurface ? 1 : 0;
+  geometry.userData.sideCoilCounterCurve = options.unfurl?.sideCoilCounterCurve ?? 0;
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

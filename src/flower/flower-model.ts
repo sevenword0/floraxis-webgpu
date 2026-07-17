@@ -7,7 +7,7 @@ import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
-import { evaluateRoseVortex } from './rose-vortex';
+import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
 import { createLeafGeometry } from './leaf-geometry';
 import {
   generateInflorescencePetalSpecs,
@@ -296,6 +296,7 @@ export class FlowerModel implements Bloomable {
     const material = this.track(createPetalMaterial(colors, m));
     const layerCounts = this.distributePetals(m.petalCount, m.layers);
     const usesUnfurl = m.budCurl > 0.01;
+    const usesVortex = usesRoseVortex(this.preset);
 
     for (let layer = 0; layer < m.layers; layer += 1) {
       const count = layerCounts[layer];
@@ -325,8 +326,9 @@ export class FlowerModel implements Bloomable {
           wave: m.unfurl,
           innerCoil: m.innerCoil,
           layer: inner,
-          sideCoil: this.preset.id === 'rose' ? 1 : 0,
+          sideCoil: usesVortex ? 1 : 0,
           sideCoilDirection: 1,
+          sideCoilCounterCurve: 0.18,
         } : undefined,
         colors,
       }));
@@ -381,7 +383,7 @@ export class FlowerModel implements Bloomable {
             wave: m.unfurl,
             contactGuard: petalThickness * 1.8 + petalWidth * 0.01,
           } : undefined,
-          vortex: this.preset.id === 'rose' ? {
+          vortex: usesVortex ? {
             layer: inner,
             phase: index / count,
             strength: m.innerCoil,

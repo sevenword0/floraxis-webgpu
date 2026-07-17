@@ -6,7 +6,7 @@ import { remapBloom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
-import { evaluateRoseVortex } from './rose-vortex';
+import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
 import { createLeafGeometry } from './leaf-geometry';
 import { FieldTerrain } from './field-terrain';
 import { sampleWindBend } from './field-environment-layout';
@@ -320,6 +320,7 @@ export class FlowerField implements Bloomable {
     const layerCounts = distributePetals(count, m.layers);
     const specs: FieldPetalSpec[] = [];
     const usesUnfurl = m.budCurl > 0.01;
+    const usesVortex = usesRoseVortex(preset);
 
     for (let layer = 0; layer < layerCounts.length; layer += 1) {
       const layerCount = layerCounts[layer];
@@ -361,7 +362,7 @@ export class FlowerField implements Bloomable {
           laneLift: clearance.laneLift,
           openDrift: clearance.openDrift * (preset.kind === 'sunflower' ? 0.55 : 1),
           contactGuard: thickness * 1.8 + petalWidth * 0.01,
-          vortex: preset.id === 'rose' ? {
+          vortex: usesVortex ? {
             phase: index / layerCount,
             strength: m.innerCoil,
             morphOffset: 1,
@@ -469,6 +470,7 @@ export class FlowerField implements Bloomable {
     const centerMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(centreGeometry, centreMaterial, plants.length));
 
     const usesUnfurl = m.budCurl > 0.01;
+    const usesVortex = usesRoseVortex(preset);
     const petalGeometry = this.track(makeMorphTargetsRelative(createPetalGeometry({
       length: m.petalLength,
       width: m.petalWidth,
@@ -487,8 +489,9 @@ export class FlowerField implements Bloomable {
         wave: m.unfurl,
         innerCoil: m.innerCoil,
         layer: 0.52,
-        sideCoil: preset.id === 'rose' ? 1 : 0,
+        sideCoil: usesVortex ? 1 : 0,
         sideCoilDirection: 1,
+        sideCoilCounterCurve: 0.18,
       } : undefined,
       segments: { width: 5, length: 9 },
       colors: preset.colors,

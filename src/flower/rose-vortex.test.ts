@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateRoseVortex } from './rose-vortex';
+import { PRESETS } from '../data/presets';
+import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
 
 describe('rose centre vortex', () => {
+  it('survives parameter editing when a rose preset becomes custom', () => {
+    const rose = PRESETS.find((preset) => preset.id === 'rose')!;
+    const tulip = PRESETS.find((preset) => preset.id === 'tulip')!;
+    const editedRose = {
+      ...rose,
+      id: 'custom',
+      morphology: { ...rose.morphology, petalWidth: rose.morphology.petalWidth * 1.18 },
+    };
+    const coiledTulip = {
+      ...tulip,
+      id: 'custom',
+      morphology: { ...tulip.morphology, budCurl: 1 },
+    };
+    const { family: _legacyFamily, ...legacyEditedRose } = editedRose;
+
+    expect(usesRoseVortex(rose)).toBe(true);
+    expect(usesRoseVortex(editedRose)).toBe(true);
+    expect(usesRoseVortex(legacyEditedRose)).toBe(true);
+    expect(usesRoseVortex(coiledTulip)).toBe(false);
+  });
+
   it('affects only inner layers and gives every inner petal the same chirality', () => {
     const outer = evaluateRoseVortex(0, 0.2, 0.2, 0.58);
     const innerA = evaluateRoseVortex(0, 1, 0.1, 0.58);
