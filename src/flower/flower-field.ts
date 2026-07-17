@@ -11,6 +11,8 @@ import { FieldTerrain } from './field-terrain';
 import { sampleWindBend } from './field-environment-layout';
 import { generateInflorescencePetalSpecs, type InflorescencePetalSpec } from './inflorescence-layout';
 import { generateFieldSupportSegments } from './field-support-layout';
+import { displayStemRadius } from './stem-proportions';
+import { expandFieldFloweringShoots } from './flowering-shoot-layout';
 import {
   botanicalLengthToWorld,
   evaluateFieldBloom,
@@ -212,10 +214,11 @@ export class FlowerField implements Bloomable {
     };
     this.root.name = 'preset-flower-field';
     const presetById = new Map(presets.map((preset) => [preset.id, preset]));
-    const plants = generateFieldLayout(this.settings, presets);
-    this.terrain = new FieldTerrain(this.settings, plants);
+    const rootPlants = generateFieldLayout(this.settings, presets);
+    const plants = expandFieldFloweringShoots(rootPlants, presets);
+    this.terrain = new FieldTerrain(this.settings, rootPlants);
     this.root.add(this.terrain.root);
-    this.maxHeight = Math.max(1, ...plants.map((plant) => plant.groundY + plant.visualHeight + plant.matureRadius));
+    this.maxHeight = Math.max(1, ...rootPlants.map((plant) => plant.groundY + plant.visualHeight + plant.matureRadius));
     const grouped = new Map<string, FieldPlant[]>();
     for (const plant of plants) {
       if (!presetById.has(plant.presetId)) continue;
@@ -354,7 +357,7 @@ export class FlowerField implements Bloomable {
       petalThickness: resolvePetalThickness(m.petalLength),
       radialSpread: growth.radialSpread,
       sepalLength: m.sepalLength,
-      stemRadius: m.stemRadius,
+      stemRadius: displayStemRadius(m.stemRadius),
       sunflower: preset.kind === 'sunflower',
     });
     const count = Math.min(m.sepalCount, preset.kind === 'sunflower' ? 10 : 6);
@@ -558,11 +561,12 @@ export class FlowerField implements Bloomable {
 
   private stemRadius(batch: SpeciesBatch, plant: FieldPlant): number {
     const m = batch.preset.morphology;
-    const botanicalRadius = m.stemRadius * THREE.MathUtils.clamp(plant.visualHeight / Math.max(0.3, m.stemHeight), 0.38, 2.3);
+    const botanicalRadius = displayStemRadius(m.stemRadius)
+      * THREE.MathUtils.clamp(plant.visualHeight / Math.max(0.3, m.stemHeight), 0.38, 2.3);
     const stemScale = THREE.MathUtils.clamp(plant.stemScale, 0.35, 2.2);
     const adjustedRadius = botanicalRadius * stemScale;
-    if (plant.layoutZone === 'tunnel') return Math.min(0.062 * stemScale, adjustedRadius * 0.58);
-    if (plant.layoutZone === 'wall') return Math.min(0.078 * stemScale, adjustedRadius * 0.72);
+    if (plant.layoutZone === 'tunnel') return Math.min(displayStemRadius(0.062, stemScale), adjustedRadius * 0.58);
+    if (plant.layoutZone === 'wall') return Math.min(displayStemRadius(0.078, stemScale), adjustedRadius * 0.72);
     return adjustedRadius;
   }
 
@@ -673,11 +677,16 @@ export class FlowerField implements Bloomable {
       const stemHeight = this.resolveHeadPose(batch, plant, time, localBloom);
       const stemTopX = this.stemEnd.x;
       const stemTopZ = this.stemEnd.z;
-      let angle = plant.yaw + slot * GOLDEN_ANGLE;
+      const opposite = architecture.leafArrangement === 'opposite';
+      const leafNode = opposite ? Math.floor(slot / 2) : slot;
+      const leafNodeCount = opposite ? Math.ceil(count / 2) : count;
+      let angle = opposite
+        ? plant.yaw + leafNode * GOLDEN_ANGLE + (slot % 2) * Math.PI
+        : plant.yaw + slot * GOLDEN_ANGLE;
       const lengthWorld = botanicalLengthToWorld(architecture.leafLengthCm) * plant.leafScale;
       const widthWorld = botanicalLengthToWorld(architecture.leafWidthCm) * plant.leafScale;
       let tilt = -0.58;
-      let ratio = 0.24 + slot / Math.max(1, count - 1) * 0.5;
+      let ratio = 0.24 + leafNode / Math.max(1, leafNodeCount - 1) * 0.5;
 
       if (architecture.leafArrangement === 'basal') {
         ratio = 0.06 + slot / Math.max(1, count) * 0.12;

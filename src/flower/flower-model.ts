@@ -12,6 +12,7 @@ import {
   generateInflorescencePetalSpecs,
   type InflorescencePetalSpec,
 } from './inflorescence-layout';
+import { displayStemRadius } from './stem-proportions';
 
 interface PetalUnfurlMotion {
   layer: number;
@@ -106,7 +107,7 @@ export class FlowerModel implements Bloomable {
       petalThickness: resolvePetalThickness(preset.morphology.petalLength),
       radialSpread: this.growth.radialSpread,
       sepalLength: preset.morphology.sepalLength,
-      stemRadius: preset.morphology.stemRadius,
+      stemRadius: displayStemRadius(preset.morphology.stemRadius),
       sunflower: preset.kind === 'sunflower',
     });
     this.petalCount = preset.morphology.petalCount + (preset.kind === 'sunflower' ? preset.morphology.discCount : 0);
@@ -135,8 +136,9 @@ export class FlowerModel implements Bloomable {
   private buildStem(): void {
     const m = this.preset.morphology;
     const architecture = resolveBotanicalArchitecture(this.preset);
+    const stemRadius = displayStemRadius(m.stemRadius);
     const stemMaterial = this.track(makeStandardMaterial({ color: this.preset.colors.stem, roughness: 0.86 }));
-    const stemGeometry = this.track(new THREE.CylinderGeometry(m.stemRadius * 0.74, m.stemRadius, m.stemHeight, 14, 5));
+    const stemGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.74, stemRadius, m.stemHeight, 14, 5));
     const stem = new THREE.Mesh(stemGeometry, stemMaterial);
     stem.position.y = m.stemHeight * 0.5;
     stem.castShadow = true;
@@ -154,7 +156,10 @@ export class FlowerModel implements Bloomable {
     const leafLength = THREE.MathUtils.clamp(architecture.leafLengthCm / (climbingVine ? 45 : 18), 0.28, 2.2);
     const leafWidth = THREE.MathUtils.clamp(architecture.leafWidthCm / (climbingVine ? 28 : 14), 0.16, 2.1);
     Array.from({ length: leafCount }, (_, index) => {
-      const fraction = index / Math.max(1, leafCount - 1);
+      const opposite = architecture.leafArrangement === 'opposite';
+      const nodeIndex = opposite ? Math.floor(index / 2) : index;
+      const nodeCount = opposite ? Math.ceil(leafCount / 2) : leafCount;
+      const fraction = nodeIndex / Math.max(1, nodeCount - 1);
       const basal = architecture.leafArrangement === 'basal';
       const clustered = architecture.leafArrangement === 'clustered';
       const separate = architecture.leafArrangement === 'separate-petiole';
@@ -163,7 +168,9 @@ export class FlowerModel implements Bloomable {
         : separate ? m.stemHeight * (0.34 + fraction * 0.2)
           : clustered ? m.stemHeight * (0.6 + fraction * 0.25)
             : m.stemHeight * (0.2 + fraction * 0.58);
-      const angle = index * GOLDEN_ANGLE + 0.7;
+      const angle = opposite
+        ? nodeIndex * GOLDEN_ANGLE + (index % 2) * Math.PI + 0.7
+        : index * GOLDEN_ANGLE + 0.7;
       const radial = new THREE.Group();
       radial.position.y = y;
       radial.rotation.y = angle;
@@ -181,7 +188,7 @@ export class FlowerModel implements Bloomable {
     if (architecture.branchCount > 0) {
       const branchLength = m.stemHeight * (architecture.stemHabit === 'woody-branch' ? 0.32 : architecture.stemHabit === 'shrub' ? 0.22 : 0.13);
       for (let index = 0; index < Math.min(8, architecture.branchCount); index += 1) {
-        const branchGeometry = this.track(new THREE.CylinderGeometry(m.stemRadius * 0.34, m.stemRadius * 0.52, branchLength, 8, 2));
+        const branchGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.34, stemRadius * 0.52, branchLength, 8, 2));
         branchGeometry.translate(0, branchLength * 0.5, 0);
         const branch = new THREE.Mesh(branchGeometry, stemMaterial);
         branch.position.y = m.stemHeight * (0.28 + (index + 1) / (architecture.branchCount + 1) * 0.48);
@@ -193,7 +200,7 @@ export class FlowerModel implements Bloomable {
     }
     if (this.preset.kind === 'wisteria') {
       const hangerLength = 0.62;
-      const hangerGeometry = this.track(new THREE.CylinderGeometry(m.stemRadius * 0.48, m.stemRadius * 0.62, hangerLength, 10, 2));
+      const hangerGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.48, stemRadius * 0.62, hangerLength, 10, 2));
       const hanger = new THREE.Mesh(hangerGeometry, stemMaterial);
       hanger.position.set(hangerLength * 0.5, m.stemHeight, 0);
       hanger.rotation.z = -Math.PI * 0.5;
@@ -205,6 +212,7 @@ export class FlowerModel implements Bloomable {
   private buildFloralAttachment(): void {
     const { morphology: m, colors } = this.preset;
     const { baseRadius, baseDepth, collarHeight } = this.attachmentLayout;
+    const stemRadius = displayStemRadius(m.stemRadius);
     const receptacleMaterial = this.track(makeStandardMaterial({ color: colors.stem, roughness: 0.88 }));
     const collarMaterial = this.track(makeStandardMaterial({ color: new THREE.Color(colors.stem).multiplyScalar(0.72), roughness: 0.94 }));
 
@@ -217,8 +225,8 @@ export class FlowerModel implements Bloomable {
     receptacle.receiveShadow = true;
 
     const collarGeometry = this.track(new THREE.CylinderGeometry(
-      Math.max(m.stemRadius * 1.05, baseRadius * 0.38),
-      m.stemRadius * 0.92,
+      Math.max(stemRadius * 1.05, baseRadius * 0.38),
+      stemRadius * 0.92,
       collarHeight,
       24,
       3,

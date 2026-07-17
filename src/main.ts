@@ -529,6 +529,9 @@ const updateResearchUI = (): void => {
     ['꽃 지름', `${architecture.flowerDiameterRangeCm[0]}–${architecture.flowerDiameterRangeCm[1]} cm`],
     ['화두 방향', `${HEAD_FACING_LABEL[architecture.headFacing]} · ${architecture.headTiltDeg}°`],
     ['잎·줄기', `${LEAF_SHAPE_LABEL[architecture.leafShape]} · ${STEM_HABIT_LABEL[architecture.stemHabit]}`],
+    ...(architecture.floweringShootCount > 1
+      ? [['뿌리당 꽃대', `${architecture.floweringShootCount}개 · 기부 벌어짐 ${architecture.basalShootSpreadDeg}°`]]
+      : []),
   ];
   qs<HTMLElement>('#research-growth').replaceChildren(...growthMetrics.map(([label, value]) => {
     const item = document.createElement('div');

@@ -115,7 +115,10 @@ describe('preset flower-field layout', () => {
       }, PRESETS);
       for (let a = 0; a < plants.length; a += 1) {
         for (let b = a + 1; b < plants.length; b += 1) {
-          expect(flowersOverlapAtFullBloom(plants[a], plants[b])).toBe(false);
+          expect(
+            flowersOverlapAtFullBloom(plants[a], plants[b]),
+            `${layoutMode}: ${a}/${plants[a].presetId} overlaps ${b}/${plants[b].presetId}`,
+          ).toBe(false);
         }
       }
     }

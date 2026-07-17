@@ -188,7 +188,15 @@ const resolvePlantValues = (
   const headAzimuthDeg = safeOverride?.headAzimuthDeg
     ?? architecture.headAzimuthDeg
     ?? sampledAzimuth;
+  const pedicelLengthCm = safeOverride?.pedicelLengthCm ?? architecture.pedicelLengthCm;
+  const pedicelWorld = botanicalLengthToWorld(pedicelLengthCm);
   const windAllowance = Math.min(0.32, Math.max(0, wind) * visualHeight * 0.028);
+  const headRadius = visualFlowerDiameter * (preset.kind === 'wisteria' ? 0.24 : 0.52);
+  const basalCrownReach = architecture.floweringShootCount > 1
+    ? Math.sin(architecture.basalShootSpreadDeg / 180 * Math.PI)
+      * Math.max(0.08, visualHeight - pedicelWorld)
+      * 0.92
+    : 0;
   return {
     scale: 1,
     stemScale: safeOverride?.stemScale ?? speciesStemScale,
@@ -199,13 +207,13 @@ const resolvePlantValues = (
     visualFlowerDiameter,
     headTiltDeg: safeOverride?.headTiltDeg ?? architecture.headTiltDeg,
     headAzimuthDeg,
-    pedicelLengthCm: safeOverride?.pedicelLengthCm ?? architecture.pedicelLengthCm,
-    pedicelWorld: botanicalLengthToWorld(safeOverride?.pedicelLengthCm ?? architecture.pedicelLengthCm),
+    pedicelLengthCm,
+    pedicelWorld,
     leafScale,
     leafCount: safeOverride?.leafCount ?? architecture.leafCount,
     branchCount: safeOverride?.branchCount ?? architecture.branchCount,
     branchAngleDeg: safeOverride?.branchAngleDeg ?? architecture.branchAngleDeg,
-    matureRadius: visualFlowerDiameter * (preset.kind === 'wisteria' ? 0.24 : 0.52) + windAllowance,
+    matureRadius: headRadius + basalCrownReach + windAllowance,
   };
 };
 
@@ -218,7 +226,7 @@ const relaxMatureCrowns = (
   layoutMode: FieldSettings['layoutMode'],
 ): void => {
   const corridorHalfWidth = fieldPathHalfWidth({ radius, layoutMode });
-  for (let iteration = 0; iteration < 52; iteration += 1) {
+  for (let iteration = 0; iteration < 96; iteration += 1) {
     let moved = false;
     for (let a = 0; a < plants.length; a += 1) {
       for (let b = a + 1; b < plants.length; b += 1) {

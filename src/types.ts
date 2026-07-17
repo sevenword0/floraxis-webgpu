@@ -114,6 +114,10 @@ export interface BotanicalArchitecture {
   headAzimuthDeg: number | null;
   pedicelLengthCm: number;
   stemHabit: StemHabit;
+  /** Flower-bearing shoots emerging from one root crown in the whole-plant model. */
+  floweringShootCount: number;
+  /** Maximum outward lean of basal flowering shoots, in degrees. */
+  basalShootSpreadDeg: number;
   branchCount: number;
   branchAngleDeg: number;
   leafShape: LeafShape;

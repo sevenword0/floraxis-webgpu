@@ -35,7 +35,7 @@ import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { sss } from 'three/addons/tsl/display/SSSNode.js';
 import { boxBlur } from 'three/addons/tsl/display/boxBlur.js';
 import type { Bloomable, FieldSettings, FlowerPreset, RenderSettings, SceneMode } from '../types';
-import { FlowerModel } from '../flower/flower-model';
+import { FloweringPlantModel } from '../flower/flowering-plant-model';
 import { FlowerField } from '../flower/flower-field';
 import { shapedDepthOfField, type ShapedDepthOfFieldNode } from './shaped-depth-of-field-node';
 
@@ -485,12 +485,12 @@ export class BloomRenderer {
 
   setFlower(preset: FlowerPreset): void {
     this.subject?.dispose();
-    this.subject = new FlowerModel(preset);
+    this.subject = new FloweringPlantModel(preset);
     this.scene.add(this.subject.root);
     this.subject.update(this.bloomProgress, performance.now());
     this.setSceneMode('specimen');
     this.specimenTargetY = preset.kind === 'hydrangea' ? 2.05 : preset.kind === 'wisteria' ? 2.32 : 1.68;
-    this.specimenCameraScale = preset.kind === 'hydrangea' ? 1.2 : preset.kind === 'wisteria' ? 1.34 : 1;
+    this.specimenCameraScale = preset.kind === 'hydrangea' ? 1.48 : preset.kind === 'wisteria' ? 1.34 : 1;
     this.focusFlower();
   }
 

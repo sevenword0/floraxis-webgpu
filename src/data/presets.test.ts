@@ -32,6 +32,8 @@ describe('botanical presets', () => {
       expect(architecture.defaultFlowerDiameterCm).toBeGreaterThanOrEqual(architecture.flowerDiameterRangeCm[0]);
       expect(architecture.defaultFlowerDiameterCm).toBeLessThanOrEqual(architecture.flowerDiameterRangeCm[1]);
       expect(architecture.headTiltDeg).toBeGreaterThanOrEqual(0);
+      expect(architecture.floweringShootCount).toBeGreaterThanOrEqual(1);
+      expect(architecture.basalShootSpreadDeg).toBeGreaterThanOrEqual(0);
       expect(architecture.leafCount).toBeGreaterThanOrEqual(0);
       expect(architecture.notes.length).toBeGreaterThanOrEqual(2);
     }
@@ -42,6 +44,8 @@ describe('botanical presets', () => {
     const wisteria = PRESETS.find((preset) => preset.id === 'wisteria');
     expect(hydrangea?.kind).toBe('hydrangea');
     expect(hydrangea?.morphology.petalCount).toBe(96);
+    expect(hydrangea?.architecture?.floweringShootCount).toBe(5);
+    expect(hydrangea?.architecture?.basalShootSpreadDeg).toBe(22);
     expect(hydrangea?.structure.some((item) => item.includes('장식화'))).toBe(true);
     expect(wisteria?.kind).toBe('wisteria');
     expect(wisteria?.architecture?.stemHabit).toBe('climbing-vine');
