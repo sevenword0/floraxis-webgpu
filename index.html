@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#0d1513" />
     <meta name="description" content="WebGPU 기반 실시간 꽃 개화 시뮬레이터. 장미, 튤립, 백합, 벚꽃, 연꽃, 해바라기를 관찰하고 나만의 꽃을 설계하세요." />
     <title>Floraxis — WebGPU 개화 시뮬레이터</title>
-    <script type="module" crossorigin src="./assets/index-CXgR0YJU.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D6Lk4TgC.css">
+    <script type="module" crossorigin src="./assets/index-wz-8SXIB.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dngh5Q5s.css">
   </head>
   <body>
     <div id="app">
@@ -136,11 +136,16 @@
                   <div id="field-species" class="species-mix" role="group" aria-label="꽃밭에 포함할 꽃"></div>
                 </div>
                 <div class="field-color-panel">
-                  <span class="field-label">종별 꽃 컬러 범위</span>
+                  <span class="field-label">종별 외형 조정</span>
                   <label class="field-layout-select" for="field-color-species">
-                    <span>색상 범위를 조정할 종</span>
+                    <span>조정할 꽃 종류</span>
                     <select id="field-color-species"></select>
                   </label>
+                  <label class="range-field">
+                    <span>줄기 두께 <output id="field-stem-scale-output">100%</output></span>
+                    <input id="field-stem-scale" type="range" min="0.35" max="2.2" step="0.01" value="1" />
+                  </label>
+                  <button type="button" id="field-stem-reset" class="field-color-reset">종 기본 두께로 초기화</button>
                   <div class="field-color-pickers">
                     <label>시작색 <input id="field-color-from" type="color" value="#9c1538" /></label>
                     <label>끝색 <input id="field-color-to" type="color" value="#f46f88" /></label>
@@ -184,6 +189,10 @@
                   <label class="range-field"><span>실제 높이 <output data-individual-output="heightCm">200cm</output></span><input type="range" min="8" max="1300" step="1" data-individual="heightCm" data-unit="cm" /></label>
                   <label class="range-field"><span>꽃/꽃차례 크기 <output data-individual-output="flowerDiameterCm">7.5cm</output></span><input type="range" min="1.5" max="120" step="0.1" data-individual="flowerDiameterCm" data-unit="cm" /></label>
                 </div>
+                <label class="range-field">
+                  <span>개별 줄기 두께 <output data-individual-output="stemScale">1×</output></span>
+                  <input type="range" min="0.35" max="2.2" step="0.01" data-individual="stemScale" data-unit="×" />
+                </label>
                 <div class="split-fields">
                   <label class="range-field"><span>측면 기울기 <output data-individual-output="headTiltDeg">22°</output></span><input type="range" min="0" max="120" step="1" data-individual="headTiltDeg" data-unit="°" /></label>
                   <label class="range-field"><span>바라보는 방위 <output data-individual-output="headAzimuthDeg">0°</output></span><input type="range" min="0" max="359" step="1" data-individual="headAzimuthDeg" data-unit="°" /></label>
