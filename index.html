@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#0d1513" />
     <meta name="description" content="WebGPU 기반 실시간 꽃 개화 시뮬레이터. 장미, 튤립, 백합, 벚꽃, 연꽃, 해바라기를 관찰하고 나만의 꽃을 설계하세요." />
     <title>Floraxis — WebGPU 개화 시뮬레이터</title>
-    <script type="module" crossorigin src="./assets/index-DrdBNZx0.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DoMo01ab.css">
+    <script type="module" crossorigin src="./assets/index-CXgR0YJU.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D6Lk4TgC.css">
   </head>
   <body>
     <div id="app">
@@ -95,6 +95,8 @@
                     <option value="concentric">동심원</option>
                     <option value="species-sectors">종별 부채꼴</option>
                     <option value="radial-composite">중심원 · 부채 · 외곽원</option>
+                    <option value="flower-tunnel">꽃 터널</option>
+                    <option value="flower-road-walls">양벽 꽃길</option>
                   </select>
                 </label>
                 <p class="field-layout-note" id="field-layout-note"></p>
@@ -133,6 +135,22 @@
                   <span class="field-label">꽃 구성</span>
                   <div id="field-species" class="species-mix" role="group" aria-label="꽃밭에 포함할 꽃"></div>
                 </div>
+                <div class="field-color-panel">
+                  <span class="field-label">종별 꽃 컬러 범위</span>
+                  <label class="field-layout-select" for="field-color-species">
+                    <span>색상 범위를 조정할 종</span>
+                    <select id="field-color-species"></select>
+                  </label>
+                  <div class="field-color-pickers">
+                    <label>시작색 <input id="field-color-from" type="color" value="#9c1538" /></label>
+                    <label>끝색 <input id="field-color-to" type="color" value="#f46f88" /></label>
+                  </div>
+                  <label class="range-field">
+                    <span>개체별 색상 랜덤화 <output id="field-color-strength-output">18%</output></span>
+                    <input id="field-color-strength" type="range" min="0" max="1" step="0.01" value="0.18" />
+                  </label>
+                  <button type="button" id="field-color-reset" class="field-color-reset">프리셋 색상으로 초기화</button>
+                </div>
                 <div class="seed-row">
                   <label for="field-seed">배치 시드</label>
                   <input id="field-seed" type="number" min="1" max="999999" step="1" value="240617" />
@@ -155,14 +173,7 @@
                 </div>
                 <label class="individual-species-row" for="individual-species">
                   <span>종 선택</span>
-                  <select id="individual-species">
-                    <option value="rose">다마스크 장미</option>
-                    <option value="tulip">아펠도른 튤립</option>
-                    <option value="lily">오리엔탈 백합</option>
-                    <option value="sakura">왕벚나무</option>
-                    <option value="lotus">연꽃</option>
-                    <option value="sunflower">해바라기</option>
-                  </select>
+                  <select id="individual-species"></select>
                 </label>
                 <div class="individual-card">
                   <strong id="individual-name">다마스크 장미 #001</strong>
@@ -171,7 +182,7 @@
                 </div>
                 <div class="split-fields">
                   <label class="range-field"><span>실제 높이 <output data-individual-output="heightCm">200cm</output></span><input type="range" min="8" max="1300" step="1" data-individual="heightCm" data-unit="cm" /></label>
-                  <label class="range-field"><span>꽃 지름 <output data-individual-output="flowerDiameterCm">7.5cm</output></span><input type="range" min="1.5" max="60" step="0.1" data-individual="flowerDiameterCm" data-unit="cm" /></label>
+                  <label class="range-field"><span>꽃/꽃차례 크기 <output data-individual-output="flowerDiameterCm">7.5cm</output></span><input type="range" min="1.5" max="120" step="0.1" data-individual="flowerDiameterCm" data-unit="cm" /></label>
                 </div>
                 <div class="split-fields">
                   <label class="range-field"><span>측면 기울기 <output data-individual-output="headTiltDeg">22°</output></span><input type="range" min="0" max="120" step="1" data-individual="headTiltDeg" data-unit="°" /></label>
