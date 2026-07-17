@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#0d1513" />
     <meta name="description" content="WebGPU 기반 실시간 꽃 개화 시뮬레이터. 장미, 튤립, 백합, 벚꽃, 연꽃, 해바라기를 관찰하고 나만의 꽃을 설계하세요." />
     <title>Floraxis — WebGPU 개화 시뮬레이터</title>
-    <script type="module" crossorigin src="./assets/index-wz-8SXIB.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Dngh5Q5s.css">
+    <script type="module" crossorigin src="./assets/index-BU2cj3zQ.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DqmIGxwy.css">
   </head>
   <body>
     <div id="app">
@@ -141,6 +141,18 @@
                     <span>조정할 꽃 종류</span>
                     <select id="field-color-species"></select>
                   </label>
+                  <div class="split-fields">
+                    <label class="range-field">
+                      <span>높이 랜덤 <output id="field-height-variation-output">35%</output></span>
+                      <input id="field-height-variation" type="range" min="0" max="1" step="0.01" value="0.35" />
+                    </label>
+                    <label class="range-field">
+                      <span>꽃 크기 랜덤 <output id="field-flower-size-variation-output">35%</output></span>
+                      <input id="field-flower-size-variation" type="range" min="0" max="1" step="0.01" value="0.35" />
+                    </label>
+                  </div>
+                  <p id="field-variation-note" class="field-variation-note"></p>
+                  <button type="button" id="field-variation-reset" class="field-color-reset">높이·꽃 크기 랜덤 끄기</button>
                   <label class="range-field">
                     <span>줄기 두께 <output id="field-stem-scale-output">100%</output></span>
                     <input id="field-stem-scale" type="range" min="0.35" max="2.2" step="0.01" value="1" />
