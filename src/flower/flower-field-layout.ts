@@ -52,6 +52,7 @@ export interface IndividualFlowerExport {
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 export const clampStemScale = (value: number): number => Math.min(2.2, Math.max(0.35, value));
+const DEFAULT_SPECIES_VARIATION = { height: 0.35, flowerSize: 0.35 };
 
 const normalizedSpecies = (speciesIds: string[]): string[] => {
   const unique = Array.from(new Set(speciesIds.filter(Boolean)));
@@ -158,15 +159,21 @@ const resolvePlantValues = (
   random: () => number,
   wind: number,
   speciesStemScale: number,
+  heightVariationStrength: number,
+  flowerSizeVariationStrength: number,
 ): Omit<FieldPlant, 'index' | 'presetId' | 'x' | 'z' | 'groundY' | 'yaw' | 'bloomDelay' | 'windPhase' | 'lod' | 'flowerColor' | 'layoutZone' | 'layoutSide' | 'supportLeanDeg' | 'supportLeanAzimuthDeg'> => {
   const architecture = resolveBotanicalArchitecture(preset);
   const safeOverride = override ? sanitizeIndividualFlowerSettings(override, preset) : undefined;
-  const heightVariation = 0.94 + random() * 0.12;
-  const diameterVariation = 0.95 + random() * 0.1;
+  const sampledHeightCm = architecture.heightRangeCm[0]
+    + random() * (architecture.heightRangeCm[1] - architecture.heightRangeCm[0]);
+  const sampledFlowerDiameterCm = architecture.flowerDiameterRangeCm[0]
+    + random() * (architecture.flowerDiameterRangeCm[1] - architecture.flowerDiameterRangeCm[0]);
   const sampledLeafScale = 0.9 + random() * 0.2;
   const sampledAzimuth = (index * 137.507764 + random() * 28) % 360;
-  const heightCm = safeOverride?.heightCm ?? architecture.defaultHeightCm * heightVariation;
-  const flowerDiameterCm = safeOverride?.flowerDiameterCm ?? architecture.defaultFlowerDiameterCm * diameterVariation;
+  const heightCm = safeOverride?.heightCm ?? architecture.defaultHeightCm
+    + (sampledHeightCm - architecture.defaultHeightCm) * clamp01(heightVariationStrength);
+  const flowerDiameterCm = safeOverride?.flowerDiameterCm ?? architecture.defaultFlowerDiameterCm
+    + (sampledFlowerDiameterCm - architecture.defaultFlowerDiameterCm) * clamp01(flowerSizeVariationStrength);
   const measuredVisualHeight = botanicalHeightToWorld(heightCm);
   // A climber's measured height is vine length, not a free-standing vertical
   // trunk. Cap its displayed elevation to a realistic garden support height.
@@ -297,7 +304,17 @@ export const generateFieldLayout = (
       : assignedPresetId;
     const preset = presetById.get(presetId) ?? presets[0];
     const speciesStemScale = clampStemScale(settings.stemScales?.[presetId] ?? 1);
-    const values = resolvePlantValues(index, preset, rawOverride, random, settings.wind, speciesStemScale);
+    const speciesVariation = settings.speciesVariations?.[presetId] ?? DEFAULT_SPECIES_VARIATION;
+    const values = resolvePlantValues(
+      index,
+      preset,
+      rawOverride,
+      random,
+      settings.wind,
+      speciesStemScale,
+      speciesVariation.height,
+      speciesVariation.flowerSize,
+    );
     const anchor = anchors[index];
     const placementRandom = seededRandom(Math.imul(seed ^ (index + 1), 0x27d4eb2d) ^ 0x165667b1);
     const usableRadius = Math.max(0.08, radius - spacing * 0.42);

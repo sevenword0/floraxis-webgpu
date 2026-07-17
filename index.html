@@ -139,6 +139,18 @@
                     <span>조정할 꽃 종류</span>
                     <select id="field-color-species"></select>
                   </label>
+                  <div class="split-fields">
+                    <label class="range-field">
+                      <span>높이 랜덤 <output id="field-height-variation-output">35%</output></span>
+                      <input id="field-height-variation" type="range" min="0" max="1" step="0.01" value="0.35" />
+                    </label>
+                    <label class="range-field">
+                      <span>꽃 크기 랜덤 <output id="field-flower-size-variation-output">35%</output></span>
+                      <input id="field-flower-size-variation" type="range" min="0" max="1" step="0.01" value="0.35" />
+                    </label>
+                  </div>
+                  <p id="field-variation-note" class="field-variation-note"></p>
+                  <button type="button" id="field-variation-reset" class="field-color-reset">높이·꽃 크기 랜덤 끄기</button>
                   <label class="range-field">
                     <span>줄기 두께 <output id="field-stem-scale-output">100%</output></span>
                     <input id="field-stem-scale" type="range" min="0.35" max="2.2" step="0.01" value="1" />

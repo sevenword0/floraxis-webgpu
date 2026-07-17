@@ -31,6 +31,7 @@ const settings: FieldSettings = {
   speciesIds: ['rose', 'tulip', 'lily'],
   colorRanges: {},
   stemScales: {},
+  speciesVariations: {},
   individuals: {},
 };
 
@@ -215,6 +216,33 @@ describe('preset flower-field layout', () => {
     }, PRESETS);
     expect(overridden[0].stemScale).toBe(2.2);
     expect(overridden.slice(1).every((plant) => plant.stemScale === 0.8)).toBe(true);
+  });
+
+  it('randomises same-species height and flower size within documented ranges', () => {
+    const preset = PRESETS.find((item) => item.id === 'sunflower')!;
+    const architecture = preset.architecture!;
+    const variedSettings = {
+      ...settings,
+      count: 36,
+      speciesIds: ['sunflower'],
+      speciesVariations: { sunflower: { height: 1, flowerSize: 1 } },
+    };
+    const first = generateFieldLayout(variedSettings, PRESETS);
+    const second = generateFieldLayout(variedSettings, PRESETS);
+    expect(first).toEqual(second);
+    expect(new Set(first.map((plant) => plant.heightCm.toFixed(2))).size).toBeGreaterThan(20);
+    expect(new Set(first.map((plant) => plant.flowerDiameterCm.toFixed(2))).size).toBeGreaterThan(20);
+    expect(first.every((plant) => plant.heightCm >= architecture.heightRangeCm[0]
+      && plant.heightCm <= architecture.heightRangeCm[1])).toBe(true);
+    expect(first.every((plant) => plant.flowerDiameterCm >= architecture.flowerDiameterRangeCm[0]
+      && plant.flowerDiameterCm <= architecture.flowerDiameterRangeCm[1])).toBe(true);
+
+    const uniform = generateFieldLayout({
+      ...variedSettings,
+      speciesVariations: { sunflower: { height: 0, flowerSize: 0 } },
+    }, PRESETS);
+    expect(new Set(uniform.map((plant) => plant.heightCm))).toEqual(new Set([architecture.defaultHeightCm]));
+    expect(new Set(uniform.map((plant) => plant.flowerDiameterCm))).toEqual(new Set([architecture.defaultFlowerDiameterCm]));
   });
 
   it('maps delayed bloom to exact global endpoints', () => {

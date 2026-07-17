@@ -197,6 +197,14 @@ export interface FieldColorRange {
   strength: number;
 }
 
+/** Seeded within-species variation mapped onto the documented botanical ranges. */
+export interface FieldSpeciesVariation {
+  /** 0 uses the preset default height; 1 samples the full documented height range. */
+  height: number;
+  /** 0 uses the preset default flower size; 1 samples the full documented size range. */
+  flowerSize: number;
+}
+
 /** Overrides attached to one deterministic field index. Values use botanical units. */
 export interface IndividualFlowerSettings {
   presetId?: string;
@@ -252,6 +260,8 @@ export interface FieldSettings {
   colorRanges: Record<string, FieldColorRange>;
   /** Per-species multipliers applied to the preset stem radius. */
   stemScales: Record<string, number>;
+  /** Per-species seeded height and flower-size variation strengths. */
+  speciesVariations: Record<string, FieldSpeciesVariation>;
   /** Per-index settings retained across deterministic field rebuilds. */
   individuals: Record<string, IndividualFlowerSettings>;
 }

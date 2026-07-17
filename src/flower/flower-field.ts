@@ -207,6 +207,7 @@ export class FlowerField implements Bloomable {
       speciesIds: [...settings.speciesIds],
       colorRanges: Object.fromEntries(Object.entries(settings.colorRanges ?? {}).map(([key, value]) => [key, { ...value }])),
       stemScales: { ...(settings.stemScales ?? {}) },
+      speciesVariations: Object.fromEntries(Object.entries(settings.speciesVariations ?? {}).map(([key, value]) => [key, { ...value }])),
       individuals: Object.fromEntries(Object.entries(settings.individuals ?? {}).map(([key, value]) => [key, { ...value }])),
     };
     this.root.name = 'preset-flower-field';

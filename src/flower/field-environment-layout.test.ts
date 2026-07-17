@@ -26,6 +26,7 @@ const settings: FieldSettings = {
   speciesIds: ['rose'],
   colorRanges: {},
   stemScales: {},
+  speciesVariations: {},
   individuals: {},
 };
 

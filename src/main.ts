@@ -77,6 +77,10 @@ const DEFAULT_COLOR_RANGES = Object.fromEntries(PRESETS.map((preset) => [preset.
 }]));
 
 const DEFAULT_STEM_SCALES = Object.fromEntries(PRESETS.map((preset) => [preset.id, 1]));
+const DEFAULT_SPECIES_VARIATIONS = Object.fromEntries(PRESETS.map((preset) => [preset.id, {
+  height: 0.35,
+  flowerSize: 0.35,
+}]));
 
 const DEFAULT_FIELD: FieldSettings = {
   count: 120,
@@ -98,6 +102,7 @@ const DEFAULT_FIELD: FieldSettings = {
   speciesIds: PRESETS.map((preset) => preset.id),
   colorRanges: DEFAULT_COLOR_RANGES,
   stemScales: DEFAULT_STEM_SCALES,
+  speciesVariations: DEFAULT_SPECIES_VARIATIONS,
   individuals: {},
 };
 
@@ -115,6 +120,7 @@ const state: AppState = {
     speciesIds: [...DEFAULT_FIELD.speciesIds],
     colorRanges: Object.fromEntries(Object.entries(DEFAULT_FIELD.colorRanges).map(([key, value]) => [key, { ...value }])),
     stemScales: { ...DEFAULT_FIELD.stemScales },
+    speciesVariations: Object.fromEntries(Object.entries(DEFAULT_FIELD.speciesVariations).map(([key, value]) => [key, { ...value }])),
     individuals: {},
   },
 };
@@ -265,6 +271,17 @@ const updateFieldColorUI = (): void => {
   stemScale.value = String(state.field.stemScales[preset.id] ?? 1);
   updateRangeVisual(stemScale);
   qs<HTMLOutputElement>('#field-stem-scale-output').value = `${Math.round(Number(stemScale.value) * 100)}%`;
+  const variation = state.field.speciesVariations[preset.id] ?? { height: 0.35, flowerSize: 0.35 };
+  const heightVariation = qs<HTMLInputElement>('#field-height-variation');
+  heightVariation.value = String(variation.height);
+  updateRangeVisual(heightVariation);
+  qs<HTMLOutputElement>('#field-height-variation-output').value = `${Math.round(variation.height * 100)}%`;
+  const flowerSizeVariation = qs<HTMLInputElement>('#field-flower-size-variation');
+  flowerSizeVariation.value = String(variation.flowerSize);
+  updateRangeVisual(flowerSizeVariation);
+  qs<HTMLOutputElement>('#field-flower-size-variation-output').value = `${Math.round(variation.flowerSize * 100)}%`;
+  const architecture = resolveBotanicalArchitecture(preset);
+  qs<HTMLElement>('#field-variation-note').textContent = `100%에서 높이 ${architecture.heightRangeCm[0]}–${architecture.heightRangeCm[1]}cm · 꽃/꽃차례 ${architecture.flowerDiameterRangeCm[0]}–${architecture.flowerDiameterRangeCm[1]}cm 범위를 시드로 재현합니다.`;
 };
 
 const renderStageControls = (): void => {
@@ -847,12 +864,37 @@ const wireEvents = (): void => {
   qs<HTMLInputElement>('#field-stem-scale').addEventListener('input', (event) => {
     state.field.stemScales[selectedColorSpeciesId] = Number((event.currentTarget as HTMLInputElement).value);
     updateFieldColorUI();
+    updateIndividualFlowerUI();
     scheduleFieldRebuild();
+  });
+  for (const [id, key] of [
+    ['field-height-variation', 'height'],
+    ['field-flower-size-variation', 'flowerSize'],
+  ] as const) {
+    qs<HTMLInputElement>(`#${id}`).addEventListener('input', (event) => {
+      const current = state.field.speciesVariations[selectedColorSpeciesId] ?? { height: 0.35, flowerSize: 0.35 };
+      state.field.speciesVariations[selectedColorSpeciesId] = {
+        ...current,
+        [key]: Number((event.currentTarget as HTMLInputElement).value),
+      };
+      updateFieldColorUI();
+      updateIndividualFlowerUI();
+      scheduleFieldRebuild();
+    });
+  }
+  qs<HTMLButtonElement>('#field-variation-reset').addEventListener('click', () => {
+    const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];
+    state.field.speciesVariations[preset.id] = { height: 0, flowerSize: 0 };
+    updateFieldColorUI();
+    updateIndividualFlowerUI();
+    scheduleFieldRebuild();
+    showToast(`${preset.name}의 높이와 꽃 크기 랜덤화를 껐습니다.`);
   });
   qs<HTMLButtonElement>('#field-stem-reset').addEventListener('click', () => {
     const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];
     state.field.stemScales[preset.id] = 1;
     updateFieldColorUI();
+    updateIndividualFlowerUI();
     scheduleFieldRebuild();
     showToast(`${preset.name}의 줄기 두께를 종 기본값으로 초기화했습니다.`);
   });
