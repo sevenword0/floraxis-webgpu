@@ -1,6 +1,7 @@
 import type { FieldSettings, FlowerPreset, IndividualFlowerSettings } from '../types';
 import { resolveBotanicalArchitecture, sanitizeIndividualFlowerSettings } from '../data/botanical-architecture';
 import { clamp01, seededRandom } from '../utils';
+import { sampleTerrainHeight } from './field-environment-layout';
 
 export type FieldLod = 'near' | 'mid' | 'far';
 
@@ -9,6 +10,7 @@ export interface FieldPlant {
   presetId: string;
   x: number;
   z: number;
+  groundY: number;
   /** Retained for compatibility with renderer diagnostics; real-unit fields drive the model. */
   scale: number;
   stemScale: number;
@@ -60,7 +62,7 @@ const matureHeadCenter = (plant: FieldPlant): { x: number; y: number; z: number 
   const horizontalPedicel = Math.sin(tilt) * plant.pedicelWorld;
   return {
     x: plant.x + Math.sin(azimuth) * horizontalPedicel,
-    y: plant.visualHeight,
+    y: plant.groundY + plant.visualHeight,
     z: plant.z + Math.cos(azimuth) * horizontalPedicel,
   };
 };
@@ -110,7 +112,7 @@ const resolvePlantValues = (
   override: IndividualFlowerSettings | undefined,
   random: () => number,
   wind: number,
-): Omit<FieldPlant, 'index' | 'presetId' | 'x' | 'z' | 'yaw' | 'bloomDelay' | 'windPhase' | 'lod'> => {
+): Omit<FieldPlant, 'index' | 'presetId' | 'x' | 'z' | 'groundY' | 'yaw' | 'bloomDelay' | 'windPhase' | 'lod'> => {
   const architecture = resolveBotanicalArchitecture(preset);
   const safeOverride = override ? sanitizeIndividualFlowerSettings(override, preset) : undefined;
   const heightVariation = 0.94 + random() * 0.12;
@@ -145,7 +147,13 @@ const resolvePlantValues = (
   };
 };
 
-const relaxMatureCrowns = (plants: FieldPlant[], radius: number, spacing: number): void => {
+const relaxMatureCrowns = (
+  plants: FieldPlant[],
+  radius: number,
+  spacing: number,
+  terrainRelief: number,
+  seed: number,
+): void => {
   for (let iteration = 0; iteration < 52; iteration += 1) {
     let moved = false;
     for (let a = 0; a < plants.length; a += 1) {
@@ -194,6 +202,7 @@ const relaxMatureCrowns = (plants: FieldPlant[], radius: number, spacing: number
         plant.x *= maxRadius / radial;
         plant.z *= maxRadius / radial;
       }
+      plant.groundY = sampleTerrainHeight(plant.x, plant.z, radius, terrainRelief, seed);
     }
     if (!moved) break;
   }
@@ -237,7 +246,14 @@ export const generateFieldLayout = (
       const angle = random() * TAU;
       x = Math.cos(angle) * candidateRadius;
       z = Math.sin(angle) * candidateRadius;
-      const candidate = { ...values, index, presetId, x, z } as FieldPlant;
+      const candidate = {
+        ...values,
+        index,
+        presetId,
+        x,
+        z,
+        groundY: sampleTerrainHeight(x, z, radius, settings.terrainRelief, settings.seed),
+      } as FieldPlant;
       if (plants.every((plant) => {
         const stemClearance = spacing * (0.9 + (candidate.visualHeight + plant.visualHeight) * 0.012);
         const crownClearance = requiredHorizontalClearance(candidate, plant);
@@ -269,6 +285,7 @@ export const generateFieldLayout = (
       presetId,
       x,
       z,
+      groundY: sampleTerrainHeight(x, z, radius, settings.terrainRelief, settings.seed),
       yaw: random() * TAU,
       bloomDelay: Math.min(0.52, waveDelay + variationDelay),
       windPhase: random() * TAU,
@@ -276,7 +293,10 @@ export const generateFieldLayout = (
     });
   }
 
-  relaxMatureCrowns(plants, radius, spacing);
+  relaxMatureCrowns(plants, radius, spacing, settings.terrainRelief, settings.seed);
+  for (const plant of plants) {
+    plant.groundY = sampleTerrainHeight(plant.x, plant.z, radius, settings.terrainRelief, settings.seed);
+  }
   return plants;
 };
 

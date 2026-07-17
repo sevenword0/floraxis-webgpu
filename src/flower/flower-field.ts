@@ -7,6 +7,8 @@ import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from 
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
 import { createLeafGeometry } from './leaf-geometry';
+import { FieldTerrain } from './field-terrain';
+import { sampleWindBend } from './field-environment-layout';
 import {
   botanicalLengthToWorld,
   evaluateFieldBloom,
@@ -166,6 +168,7 @@ export class FlowerField implements Bloomable {
   readonly maxHeight: number;
 
   private readonly settings: FieldSettings;
+  private readonly terrain: FieldTerrain;
   private readonly batches: SpeciesBatch[] = [];
   private readonly disposables = new Set<{ dispose(): void }>();
   private readonly transform = new THREE.Object3D();
@@ -194,7 +197,9 @@ export class FlowerField implements Bloomable {
     this.root.name = 'preset-flower-field';
     const presetById = new Map(presets.map((preset) => [preset.id, preset]));
     const plants = generateFieldLayout(this.settings, presets);
-    this.maxHeight = Math.max(1, ...plants.map((plant) => plant.visualHeight + plant.matureRadius));
+    this.terrain = new FieldTerrain(this.settings, plants);
+    this.root.add(this.terrain.root);
+    this.maxHeight = Math.max(1, ...plants.map((plant) => plant.groundY + plant.visualHeight + plant.matureRadius));
     const grouped = new Map<string, FieldPlant[]>();
     for (const plant of plants) {
       if (!presetById.has(plant.presetId)) continue;
@@ -440,7 +445,7 @@ export class FlowerField implements Bloomable {
 
   private resolveHeadPose(batch: SpeciesBatch, plant: FieldPlant, time: number, localBloom: number): number {
     const wind = Math.min(1.4, Math.max(0, this.settings.wind));
-    const pulse = time * 0.00058;
+    const turbulence = Math.min(1, Math.max(0, this.settings.windTurbulence ?? 0.58));
     const sunflowerLock = batch.preset.kind === 'sunflower' ? smoothstep(0.34, 0.68, localBloom) : 1;
     const trackedAzimuth = plant.headAzimuthDeg * DEG + Math.sin(time * 0.00012 + plant.windPhase) * 0.62;
     const lockedAzimuth = plant.headAzimuthDeg * DEG;
@@ -448,15 +453,23 @@ export class FlowerField implements Bloomable {
     const tilt = Math.max(0, plant.headTiltDeg - (batch.preset.kind === 'sunflower' ? (1 - sunflowerLock) * 18 : 0)) * DEG;
     const verticalPedicel = Math.cos(tilt) * plant.pedicelWorld;
     const stemHeight = Math.max(0.16, plant.visualHeight - verticalPedicel);
-    const swayX = Math.sin(pulse + plant.windPhase) * wind * stemHeight * 0.034;
-    const swayZ = Math.cos(pulse * 0.83 + plant.windPhase * 1.31) * wind * stemHeight * 0.025;
+    const windBend = sampleWindBend(time, plant.x, plant.z, plant.windPhase, wind, turbulence);
+    const swayX = windBend.x * stemHeight * 0.045;
+    const swayZ = windBend.z * stemHeight * 0.039;
+    const pedicelFlex = windBend.gust * (2.1 + Math.min(4.2, plant.pedicelWorld * 18)) * DEG;
+    const dynamicTilt = Math.max(0, tilt + pedicelFlex);
+    const dynamicYaw = yaw + Math.sin(time * 0.00145 + plant.windPhase * 1.37) * wind * turbulence * 0.045;
 
-    this.stemStart.set(plant.x, 0, plant.z);
-    this.stemEnd.set(plant.x + swayX * 0.72, stemHeight, plant.z + swayZ * 0.72);
-    this.direction.set(Math.sin(yaw) * Math.sin(tilt), Math.cos(tilt), Math.cos(yaw) * Math.sin(tilt));
+    this.stemStart.set(plant.x, plant.groundY, plant.z);
+    this.stemEnd.set(plant.x + swayX * 0.72, plant.groundY + stemHeight, plant.z + swayZ * 0.72);
+    this.direction.set(
+      Math.sin(dynamicYaw) * Math.sin(dynamicTilt),
+      Math.cos(dynamicTilt),
+      Math.cos(dynamicYaw) * Math.sin(dynamicTilt),
+    );
     this.headPosition.copy(this.stemEnd).addScaledVector(this.direction, plant.pedicelWorld);
-    this.yawQuaternion.setFromAxisAngle(this.up, yaw);
-    this.tiltQuaternion.setFromAxisAngle(this.right, tilt);
+    this.yawQuaternion.setFromAxisAngle(this.up, dynamicYaw);
+    this.tiltQuaternion.setFromAxisAngle(this.right, dynamicTilt);
     this.headQuaternion.copy(this.yawQuaternion).multiply(this.tiltQuaternion);
     return stemHeight;
   }
@@ -523,12 +536,20 @@ export class FlowerField implements Bloomable {
         const localBloom = evaluateFieldBloom(this.currentProgress, plant.bloomDelay);
         const stemHeight = this.resolveHeadPose(batch, plant, time, localBloom);
         const ratio = 0.26 + (slot + 1) / (plant.branchCount + 1) * 0.56;
-        const angle = plant.yaw + slot * GOLDEN_ANGLE;
-        const branchAngle = plant.branchAngleDeg * DEG;
+        const branchWind = sampleWindBend(
+          time,
+          plant.x,
+          plant.z,
+          plant.windPhase + slot * 0.73,
+          this.settings.wind,
+          this.settings.windTurbulence ?? 0.58,
+        );
+        const angle = plant.yaw + slot * GOLDEN_ANGLE + branchWind.x * 0.035;
+        const branchAngle = plant.branchAngleDeg * DEG + branchWind.gust * 0.055;
         const length = plant.visualHeight * habitLength * (0.82 + (slot % 3) * 0.09);
         this.stemStart.set(
           THREE.MathUtils.lerp(plant.x, this.stemEnd.x, ratio),
-          stemHeight * ratio,
+          plant.groundY + stemHeight * ratio,
           THREE.MathUtils.lerp(plant.z, this.stemEnd.z, ratio),
         );
         this.stemEnd.set(
@@ -572,24 +593,32 @@ export class FlowerField implements Bloomable {
 
       if (architecture.leafArrangement === 'separate-petiole') {
         const reach = plant.visualHeight * (0.18 + slot * 0.055);
-        this.stemStart.set(plant.x, 0, plant.z);
+        this.stemStart.set(plant.x, plant.groundY, plant.z);
         this.stemEnd.set(
           plant.x + Math.sin(angle) * reach,
-          plant.visualHeight * (0.42 + slot * 0.1),
+          plant.groundY + plant.visualHeight * (0.42 + slot * 0.1),
           plant.z + Math.cos(angle) * reach,
         );
         tilt = 0.04 + Math.sin(slot * 2.1) * 0.04;
       } else if (architecture.leafArrangement === 'clustered' && plant.branchCount > 0) {
         const branchSlot = slot % plant.branchCount;
         const branchRatio = 0.26 + (branchSlot + 1) / (plant.branchCount + 1) * 0.56;
-        angle = plant.yaw + branchSlot * GOLDEN_ANGLE;
-        const branchAngle = plant.branchAngleDeg * DEG;
+        const branchWind = sampleWindBend(
+          time,
+          plant.x,
+          plant.z,
+          plant.windPhase + branchSlot * 0.73,
+          this.settings.wind,
+          this.settings.windTurbulence ?? 0.58,
+        );
+        angle = plant.yaw + branchSlot * GOLDEN_ANGLE + branchWind.x * 0.035;
+        const branchAngle = plant.branchAngleDeg * DEG + branchWind.gust * 0.055;
         const branchLength = plant.visualHeight * 0.34 * (0.82 + (branchSlot % 3) * 0.09);
         const branchBaseX = THREE.MathUtils.lerp(plant.x, stemTopX, branchRatio);
         const branchBaseZ = THREE.MathUtils.lerp(plant.z, stemTopZ, branchRatio);
         this.stemStart.set(
           branchBaseX + Math.sin(angle) * Math.sin(branchAngle) * branchLength,
-          stemHeight * branchRatio + Math.cos(branchAngle) * branchLength,
+          plant.groundY + stemHeight * branchRatio + Math.cos(branchAngle) * branchLength,
           branchBaseZ + Math.cos(angle) * Math.sin(branchAngle) * branchLength,
         );
         const petiole = Math.max(0.025, Math.min(0.18, widthWorld * 0.58));
@@ -601,7 +630,7 @@ export class FlowerField implements Bloomable {
       } else {
         this.stemStart.set(
           THREE.MathUtils.lerp(plant.x, stemTopX, ratio),
-          stemHeight * ratio,
+          plant.groundY + stemHeight * ratio,
           THREE.MathUtils.lerp(plant.z, stemTopZ, ratio),
         );
         const petiole = Math.max(0.025, Math.min(0.16, widthWorld * 0.52));
@@ -612,9 +641,27 @@ export class FlowerField implements Bloomable {
         );
       }
 
+      const leafWind = sampleWindBend(
+        time,
+        this.stemEnd.x,
+        this.stemEnd.z,
+        plant.windPhase + slot * 0.91,
+        this.settings.wind,
+        this.settings.windTurbulence ?? 0.58,
+      );
+      const leafFlutter = Math.sin(time * 0.0032 + plant.windPhase * 1.7 + slot * 1.13)
+        * this.settings.wind
+        * (0.035 + (this.settings.windTurbulence ?? 0.58) * 0.085);
+      this.stemEnd.x += leafWind.x * lengthWorld * 0.09;
+      this.stemEnd.z += leafWind.z * lengthWorld * 0.09;
       this.setCylinderBetween(batch.leafStemMesh!, index, this.stemStart, this.stemEnd, this.stemRadius(batch, plant) * 0.22);
       this.transform.position.copy(this.stemEnd);
-      this.transform.rotation.set(tilt, angle, Math.sin(slot * 2.47) * 0.08, 'YXZ');
+      this.transform.rotation.set(
+        tilt + leafWind.z * 0.12 + leafFlutter,
+        angle,
+        Math.sin(slot * 2.47) * 0.08 - leafWind.x * 0.2 + leafFlutter * 0.62,
+        'YXZ',
+      );
       this.transform.scale.set(Math.max(0.025, widthWorld), 1, Math.max(0.04, lengthWorld));
       this.transform.updateMatrix();
       batch.leafMesh!.setMatrixAt(index, this.transform.matrix);
@@ -635,6 +682,11 @@ export class FlowerField implements Bloomable {
       const deployment = unfurl?.deployment ?? local;
       const articulation = unfurl ? unfurl.unfurl * 0.72 + unfurl.reflex * 0.28 : local;
       const livingMotion = Math.sin(subtleTime * 0.52 + spec.phase + plant.windPhase) * 0.48 * smoothstep(0.78, 1, localBloom);
+      const petalExposure = smoothstep(0.1, 0.82, localBloom);
+      const petalFlutter = (
+        Math.sin(subtleTime * (2.1 + (this.settings.windTurbulence ?? 0.58) * 1.8) + spec.phase * 1.7 + plant.windPhase) * 1.7
+        + Math.sin(subtleTime * 0.64 + spec.angle * 2.3 + plant.windPhase) * 0.65
+      ) * this.settings.wind * petalExposure;
       const clearance = smoothstep(0.12, 0.88, deployment);
       const contactSeparation = unfurl?.contactSeparation ?? 0;
 
@@ -650,11 +702,19 @@ export class FlowerField implements Bloomable {
           + spec.openDrift * batch.growth.radialSpread * clearance
           + spec.contactGuard * contactSeparation,
       );
-      this.hinge.rotation.set((THREE.MathUtils.lerp(spec.closedAngle, spec.openAngle, deployment) + livingMotion) * DEG, 0, spec.sweep * articulation);
+      this.hinge.rotation.set(
+        (THREE.MathUtils.lerp(spec.closedAngle, spec.openAngle, deployment) + livingMotion + petalFlutter) * DEG,
+        0,
+        spec.sweep * articulation + petalFlutter * DEG * 0.34,
+      );
       this.hinge.scale.set(1, 1, 1);
       this.hinge.updateMatrix();
       this.meshPose.position.set(0, 0, 0);
-      this.meshPose.rotation.set(0, THREE.MathUtils.lerp(spec.closedRoll, spec.roll, articulation), 0);
+      this.meshPose.rotation.set(
+        0,
+        THREE.MathUtils.lerp(spec.closedRoll, spec.roll, articulation) + petalFlutter * DEG * 0.18,
+        0,
+      );
       this.meshPose.scale.set(1, 1, 1);
       this.meshPose.updateMatrix();
 
@@ -709,6 +769,7 @@ export class FlowerField implements Bloomable {
 
   update(progress: number, time: number): void {
     this.currentProgress = Math.min(1, Math.max(0, progress));
+    this.terrain.update(time);
     for (const batch of this.batches) {
       this.updatePlantMeshes(batch, time);
       this.updateLeaves(batch, time);
@@ -718,6 +779,7 @@ export class FlowerField implements Bloomable {
   }
 
   dispose(): void {
+    this.terrain.dispose();
     this.root.removeFromParent();
     this.disposables.forEach((item) => item.dispose());
     this.disposables.clear();

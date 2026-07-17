@@ -35,6 +35,8 @@ WebGPU 기반 실시간 개화 시뮬레이터입니다. 연구 자료에서 확
 - 완전 개화 지름, 머리 기울기, 꽃자루와 바람 여유를 함께 계산하는 3차원 성숙 꽃머리 충돌 완화
 - 개체별 실제 높이·꽃 지름·방위·기울기·꽃자루·잎 크기/수·가지 수/각도 편집
 - 한 개체 설정을 클립보드와 `floraxis.individual-flower` JSON으로 복사해 다른 꽃밭에 재사용
+- 배치 시드와 공유되는 흙 굴곡·색 얼룩, 무성한 잔풀·지피 수풀, 작은 돌의 절차적 지표 생태층
+- 공간적으로 이어지는 바람장에 꽃대·꽃자루·잎·꽃잎과 수풀별 강성 및 난류 응답
 - 전역 0%에서는 모든 꽃이 봉오리이고 100%에서는 모든 꽃이 완전히 개화하도록 보존된 타임라인
 
 ## WebGPU 렌더링
@@ -48,6 +50,7 @@ Floraxis는 Three.js의 최신 WebGPU 렌더러와 TSL(Render Pipeline)을 사�
 - SSS(Screen-Space Contact Shadows) + 소프트 블러
 - `MeshSSSNodeMaterial` 기반 꽃잎 subsurface scattering
 - 절차적 주맥·측맥 normal map과 실제 측면 셸을 결합한 꽃잎 두께 표현
+- 잔풀·수풀·돌을 각각 한 번에 그리는 WebGPU 인스턴싱과 동적 바람 행렬
 - 2K PCF 소프트 섀도 맵
 - Bloom, ACES tone mapping, SMAA
 

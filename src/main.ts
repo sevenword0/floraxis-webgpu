@@ -61,6 +61,11 @@ const DEFAULT_FIELD: FieldSettings = {
   bloomWave: 0.64,
   bloomVariance: 0.32,
   wind: 0.36,
+  windTurbulence: 0.58,
+  groundCover: 0.88,
+  shrubDensity: 0.76,
+  rockDensity: 0.42,
+  terrainRelief: 0.38,
   seed: 240617,
   speciesIds: PRESETS.map((preset) => preset.id),
   individuals: {},
@@ -98,7 +103,18 @@ let refocusFieldAfterRebuild = false;
 let lastStatsUpdate = 0;
 let selectedFlowerIndex = 0;
 
-type FieldNumericKey = 'count' | 'radius' | 'spacing' | 'bloomWave' | 'bloomVariance' | 'wind';
+type FieldNumericKey =
+  | 'count'
+  | 'radius'
+  | 'spacing'
+  | 'bloomWave'
+  | 'bloomVariance'
+  | 'wind'
+  | 'windTurbulence'
+  | 'groundCover'
+  | 'shrubDensity'
+  | 'rockDensity'
+  | 'terrainRelief';
 
 try {
   const stored = localStorage.getItem('floraxis:custom-preset');

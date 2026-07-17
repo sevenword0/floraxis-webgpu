@@ -8,6 +8,7 @@ import {
   generateFieldLayout,
   parseIndividualFlowerExport,
 } from './flower-field-layout';
+import { sampleTerrainHeight } from './field-environment-layout';
 
 const settings: FieldSettings = {
   count: 48,
@@ -16,6 +17,11 @@ const settings: FieldSettings = {
   bloomWave: 0.7,
   bloomVariance: 0.35,
   wind: 0.4,
+  windTurbulence: 0.58,
+  groundCover: 0.82,
+  shrubDensity: 0.62,
+  rockDensity: 0.38,
+  terrainRelief: 0.32,
   seed: 8128,
   speciesIds: ['rose', 'tulip', 'lily'],
   individuals: {},
@@ -29,6 +35,13 @@ describe('preset flower-field layout', () => {
     expect(first).toEqual(second);
     expect(first).toHaveLength(settings.count);
     expect(first.every((plant) => Math.hypot(plant.x, plant.z) <= settings.radius)).toBe(true);
+    expect(first.every((plant) => plant.groundY === sampleTerrainHeight(
+      plant.x,
+      plant.z,
+      settings.radius,
+      settings.terrainRelief,
+      settings.seed,
+    ))).toBe(true);
   });
 
   it('includes every enabled species and honours spacing in a roomy layout', () => {

@@ -180,6 +180,16 @@ export interface FieldSettings {
   bloomVariance: number;
   /** Wind sway strength shared by stems and flower heads. */
   wind: number;
+  /** High-frequency wind variation layered over the coherent field direction. */
+  windTurbulence: number;
+  /** Density of grass-like ground cover. */
+  groundCover: number;
+  /** Density of low broadleaf understory clumps. */
+  shrubDensity: number;
+  /** Density of small procedural stones. */
+  rockDensity: number;
+  /** Amplitude of the deterministic soil height field. */
+  terrainRelief: number;
   /** Deterministic seed used for placement, species assignment, and motion phases. */
   seed: number;
   /** Presets participating in the field mixture. */

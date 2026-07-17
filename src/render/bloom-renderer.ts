@@ -94,7 +94,6 @@ export class BloomRenderer {
   private fieldRadius = 6.5;
   private fieldHeight = 3.2;
   private readonly specimenStage = new THREE.Group();
-  private fieldGround?: THREE.Mesh;
   private bloomProgress = 0;
   private settings!: RenderSettings;
   private width = 1;
@@ -205,18 +204,6 @@ export class BloomRenderer {
     });
     this.scene.add(this.specimenStage);
 
-    const fieldMaterial = new THREE.MeshPhysicalNodeMaterial({
-      color: 0x172620,
-      metalness: 0.08,
-      roughness: 0.78,
-      clearcoat: 0.22,
-      clearcoatRoughness: 0.74,
-    });
-    this.fieldGround = new THREE.Mesh(new THREE.CylinderGeometry(10.8, 11, 0.12, 112), fieldMaterial);
-    this.fieldGround.position.y = -0.12;
-    this.fieldGround.receiveShadow = true;
-    this.fieldGround.visible = false;
-    this.scene.add(this.fieldGround);
   }
 
   private async setupEnvironment(): Promise<void> {
@@ -410,7 +397,6 @@ export class BloomRenderer {
   private setSceneMode(mode: SceneMode): void {
     this.sceneMode = mode;
     this.specimenStage.visible = mode === 'specimen';
-    if (this.fieldGround) this.fieldGround.visible = mode === 'field';
   }
 
   private setShadowExtent(horizontal: number, vertical: number): void {
