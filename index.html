@@ -110,6 +110,66 @@
               </div>
             </section>
 
+            <section class="control-section field-only is-hidden" aria-labelledby="individual-title">
+              <button class="section-heading" id="individual-title" type="button" aria-expanded="true">
+                <span><i>04</i> INDIVIDUAL BOTANY</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
+              </button>
+              <div class="section-body individual-controls">
+                <div class="individual-picker">
+                  <button type="button" id="individual-prev" aria-label="이전 꽃">←</button>
+                  <label for="individual-index">개별 꽃 ID</label>
+                  <input id="individual-index" type="number" min="1" max="120" step="1" value="1" />
+                  <button type="button" id="individual-next" aria-label="다음 꽃">→</button>
+                </div>
+                <label class="individual-species-row" for="individual-species">
+                  <span>종 선택</span>
+                  <select id="individual-species">
+                    <option value="rose">다마스크 장미</option>
+                    <option value="tulip">아펠도른 튤립</option>
+                    <option value="lily">오리엔탈 백합</option>
+                    <option value="sakura">왕벚나무</option>
+                    <option value="lotus">연꽃</option>
+                    <option value="sunflower">해바라기</option>
+                  </select>
+                </label>
+                <div class="individual-card">
+                  <strong id="individual-name">다마스크 장미 #001</strong>
+                  <small id="individual-scientific">Rosa × damascena</small>
+                  <div><span id="individual-facing">측향 · 22°</span><span id="individual-habit">분지 관목</span><span id="individual-leaf-shape">우상복엽·톱니</span></div>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>실제 높이 <output data-individual-output="heightCm">200cm</output></span><input type="range" min="8" max="1300" step="1" data-individual="heightCm" data-unit="cm" /></label>
+                  <label class="range-field"><span>꽃 지름 <output data-individual-output="flowerDiameterCm">7.5cm</output></span><input type="range" min="1.5" max="60" step="0.1" data-individual="flowerDiameterCm" data-unit="cm" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>측면 기울기 <output data-individual-output="headTiltDeg">22°</output></span><input type="range" min="0" max="120" step="1" data-individual="headTiltDeg" data-unit="°" /></label>
+                  <label class="range-field"><span>바라보는 방위 <output data-individual-output="headAzimuthDeg">0°</output></span><input type="range" min="0" max="359" step="1" data-individual="headAzimuthDeg" data-unit="°" /></label>
+                </div>
+                <label class="range-field">
+                  <span>꽃자루 길이 <output data-individual-output="pedicelLengthCm">5cm</output></span>
+                  <input type="range" min="0" max="60" step="0.5" data-individual="pedicelLengthCm" data-unit="cm" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>잎 크기 <output data-individual-output="leafScale">1</output></span><input type="range" min="0.25" max="2.5" step="0.05" data-individual="leafScale" /></label>
+                  <label class="range-field"><span>잎 수 <output data-individual-output="leafCount">5</output></span><input type="range" min="0" max="24" step="1" data-individual="leafCount" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>가지 수 <output data-individual-output="branchCount">3</output></span><input type="range" min="0" max="10" step="1" data-individual="branchCount" /></label>
+                  <label class="range-field"><span>가지 벌어짐 <output data-individual-output="branchAngleDeg">42°</output></span><input type="range" min="5" max="88" step="1" data-individual="branchAngleDeg" data-unit="°" /></label>
+                </div>
+                <p class="individual-structure-note" id="individual-structure-note"></p>
+                <p class="field-lod-note">cm 실측값을 저장하며, 한 장면에서 초본과 10m급 교목을 함께 관찰하도록 높이는 비교 축척, 꽃은 2× 세부 확대를 사용합니다. 충돌 판정은 완전 개화 지름으로 계산합니다.</p>
+                <div class="individual-actions">
+                  <button type="button" id="individual-copy">클립보드 복사</button>
+                  <button type="button" id="individual-paste">붙여넣기</button>
+                  <button type="button" id="individual-export">JSON 저장</button>
+                  <button type="button" id="individual-import">파일 적용</button>
+                  <button type="button" id="individual-reset">기본값 복원</button>
+                  <input type="file" id="individual-import-file" accept="application/json,.json" hidden />
+                </div>
+              </div>
+            </section>
+
             <section class="control-section specimen-only" aria-labelledby="morph-title">
               <button class="section-heading" id="morph-title" type="button" aria-expanded="true">
                 <span><i>03</i> MORPHOLOGY</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>

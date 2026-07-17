@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PRESETS } from './presets';
+import { resolveBotanicalArchitecture } from './botanical-architecture';
 import { sanitizePreset, validatePreset } from '../utils';
 
 describe('botanical presets', () => {
@@ -24,6 +25,14 @@ describe('botanical presets', () => {
       expect(preset.growth!.closedPetalWidth).toBeLessThanOrEqual(1);
       expect(preset.growth!.observations.length).toBeGreaterThanOrEqual(2);
       expect(preset.growth!.mappingNote.length).toBeGreaterThan(12);
+      const architecture = resolveBotanicalArchitecture(preset);
+      expect(architecture.defaultHeightCm).toBeGreaterThanOrEqual(architecture.heightRangeCm[0]);
+      expect(architecture.defaultHeightCm).toBeLessThanOrEqual(architecture.heightRangeCm[1]);
+      expect(architecture.defaultFlowerDiameterCm).toBeGreaterThanOrEqual(architecture.flowerDiameterRangeCm[0]);
+      expect(architecture.defaultFlowerDiameterCm).toBeLessThanOrEqual(architecture.flowerDiameterRangeCm[1]);
+      expect(architecture.headTiltDeg).toBeGreaterThanOrEqual(0);
+      expect(architecture.leafCount).toBeGreaterThanOrEqual(0);
+      expect(architecture.notes.length).toBeGreaterThanOrEqual(2);
     }
   });
 

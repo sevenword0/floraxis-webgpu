@@ -1,11 +1,13 @@
 import * as THREE from 'three/webgpu';
 import { color, float } from 'three/tsl';
+import { resolveBotanicalArchitecture } from '../data/botanical-architecture';
 import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } from '../growth-model';
 import type { Bloomable, BloomGrowthProfile, FlowerPreset } from '../types';
 import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
+import { createLeafGeometry } from './leaf-geometry';
 
 interface PetalUnfurlMotion {
   layer: number;
@@ -74,10 +76,15 @@ export class FlowerModel implements Bloomable {
   private discMesh?: THREE.InstancedMesh;
   private readonly dummy = new THREE.Object3D();
   private lastProgress = -1;
+  private readonly headBaseTilt: number;
+  private readonly headBaseYaw: number;
 
   constructor(preset: FlowerPreset) {
     this.preset = preset;
     this.growth = resolveGrowthProfile(preset);
+    const architecture = resolveBotanicalArchitecture(preset);
+    this.headBaseTilt = architecture.headTiltDeg * DEG;
+    this.headBaseYaw = (architecture.headAzimuthDeg ?? 0) * DEG;
     this.attachmentLayout = computeFloralAttachment({
       headRadius: preset.morphology.headRadius,
       petalCount: preset.morphology.petalCount,
@@ -93,6 +100,7 @@ export class FlowerModel implements Bloomable {
     this.root.name = `flower-${preset.id}`;
     this.buildStem();
     this.head.position.y = preset.morphology.stemHeight;
+    this.head.rotation.set(this.headBaseTilt, this.headBaseYaw, 0, 'YXZ');
     this.head.scale.setScalar(preset.morphology.flowerScale);
     this.root.add(this.head);
     this.buildFloralAttachment();
@@ -108,6 +116,7 @@ export class FlowerModel implements Bloomable {
 
   private buildStem(): void {
     const m = this.preset.morphology;
+    const architecture = resolveBotanicalArchitecture(this.preset);
     const stemMaterial = this.track(makeStandardMaterial({ color: this.preset.colors.stem, roughness: 0.86 }));
     const stemGeometry = this.track(new THREE.CylinderGeometry(m.stemRadius * 0.74, m.stemRadius, m.stemHeight, 14, 5));
     const stem = new THREE.Mesh(stemGeometry, stemMaterial);
@@ -121,34 +130,48 @@ export class FlowerModel implements Bloomable {
     leafMaterial.thicknessAttenuationNode = float(0.38);
     leafMaterial.thicknessScaleNode = float(6);
 
-    [
-      { y: m.stemHeight * 0.39, angle: 0.7, scale: 0.72 },
-      { y: m.stemHeight * 0.6, angle: 3.8, scale: 0.56 },
-    ].forEach((leaf, index) => {
-      const geometry = this.track(createPetalGeometry({
-        length: 0.9 * leaf.scale,
-        width: 0.46 * leaf.scale,
-        shape: 'lance',
-        taper: 0.68,
-        notch: 0,
-        waviness: 0.025,
-        cup: 0.16,
-        curl: 0.2,
-        fold: 0.24,
-        seed: index + 41,
-        colors: { base: this.preset.colors.stem, tip: '#6f9c5f' },
-      }));
+    const leafGeometry = this.track(createLeafGeometry(architecture.leafShape));
+    const leafCount = Math.min(10, Math.max(0, architecture.leafCount));
+    const leafLength = THREE.MathUtils.clamp(architecture.leafLengthCm / 18, 0.28, 2.2);
+    const leafWidth = THREE.MathUtils.clamp(architecture.leafWidthCm / 14, 0.16, 2.1);
+    Array.from({ length: leafCount }, (_, index) => {
+      const fraction = index / Math.max(1, leafCount - 1);
+      const basal = architecture.leafArrangement === 'basal';
+      const clustered = architecture.leafArrangement === 'clustered';
+      const separate = architecture.leafArrangement === 'separate-petiole';
+      const y = basal
+        ? m.stemHeight * (0.05 + fraction * 0.12)
+        : separate ? m.stemHeight * (0.34 + fraction * 0.2)
+          : clustered ? m.stemHeight * (0.6 + fraction * 0.25)
+            : m.stemHeight * (0.2 + fraction * 0.58);
+      const angle = index * GOLDEN_ANGLE + 0.7;
       const radial = new THREE.Group();
-      radial.position.y = leaf.y;
-      radial.rotation.y = leaf.angle;
-      radial.rotation.x = 1.18;
-      radial.rotation.z = index === 0 ? -0.28 : 0.22;
-      const mesh = new THREE.Mesh(geometry, leafMaterial);
-      mesh.morphTargetInfluences![0] = 1;
+      radial.position.y = y;
+      radial.rotation.y = angle;
+      radial.rotation.x = separate ? 0.03 : basal ? -1.02 : clustered ? -0.62 : architecture.leafArrangement === 'whorled' ? -0.48 : -0.58;
+      radial.rotation.z = Math.sin(index * 2.1) * 0.12;
+      if (separate) radial.position.set(Math.sin(angle) * m.stemHeight * 0.18, y, Math.cos(angle) * m.stemHeight * 0.18);
+      const mesh = new THREE.Mesh(leafGeometry, leafMaterial);
+      mesh.scale.set(leafWidth, 1, leafLength);
       mesh.castShadow = true;
+      mesh.receiveShadow = true;
       radial.add(mesh);
       this.root.add(radial);
     });
+
+    if (architecture.branchCount > 0) {
+      const branchLength = m.stemHeight * (architecture.stemHabit === 'woody-branch' ? 0.32 : architecture.stemHabit === 'shrub' ? 0.22 : 0.13);
+      for (let index = 0; index < Math.min(8, architecture.branchCount); index += 1) {
+        const branchGeometry = this.track(new THREE.CylinderGeometry(m.stemRadius * 0.34, m.stemRadius * 0.52, branchLength, 8, 2));
+        branchGeometry.translate(0, branchLength * 0.5, 0);
+        const branch = new THREE.Mesh(branchGeometry, stemMaterial);
+        branch.position.y = m.stemHeight * (0.28 + (index + 1) / (architecture.branchCount + 1) * 0.48);
+        branch.rotation.y = index * GOLDEN_ANGLE;
+        branch.rotation.z = architecture.branchAngleDeg * DEG;
+        branch.castShadow = true;
+        this.root.add(branch);
+      }
+    }
   }
 
   private buildFloralAttachment(): void {
@@ -608,7 +631,8 @@ export class FlowerModel implements Bloomable {
       });
       this.discMesh.instanceMatrix.needsUpdate = true;
     }
-    this.head.rotation.y = Math.sin(subtleTime * 0.14) * 0.012;
+    this.head.rotation.x = this.headBaseTilt + Math.cos(subtleTime * 0.12) * 0.006;
+    this.head.rotation.y = this.headBaseYaw + Math.sin(subtleTime * 0.14) * 0.012;
     this.head.position.y = m.stemHeight + Math.sin(subtleTime * 0.36) * 0.006;
     this.lastProgress = progress;
   }

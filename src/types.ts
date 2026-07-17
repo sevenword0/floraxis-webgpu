@@ -82,6 +82,45 @@ export interface BloomGrowthProfile {
   mappingNote: string;
 }
 
+export type HeadFacing = 'upward' | 'outward' | 'drooping';
+
+export type StemHabit = 'shrub' | 'scape' | 'erect-leafy' | 'woody-branch' | 'aquatic-scape' | 'upright';
+
+export type LeafShape =
+  | 'compound-pinnate'
+  | 'broad-lanceolate'
+  | 'lanceolate'
+  | 'elliptic-serrate'
+  | 'peltate-orbicular'
+  | 'ovate-serrate';
+
+export type LeafArrangement = 'alternate' | 'basal' | 'whorled' | 'clustered' | 'separate-petiole';
+
+/** Measured plant architecture used by the whole-plant and field renderers. */
+export interface BotanicalArchitecture {
+  /** Typical whole-plant height interval in centimetres. */
+  heightRangeCm: [number, number];
+  defaultHeightCm: number;
+  /** Fully open flower/head diameter interval in centimetres. */
+  flowerDiameterRangeCm: [number, number];
+  defaultFlowerDiameterCm: number;
+  headFacing: HeadFacing;
+  /** Degrees away from straight upward: 0° up, 90° horizontal, >90° nodding. */
+  headTiltDeg: number;
+  /** Default azimuth in degrees; null means deterministic per-plant variation. */
+  headAzimuthDeg: number | null;
+  pedicelLengthCm: number;
+  stemHabit: StemHabit;
+  branchCount: number;
+  branchAngleDeg: number;
+  leafShape: LeafShape;
+  leafArrangement: LeafArrangement;
+  leafCount: number;
+  leafLengthCm: number;
+  leafWidthCm: number;
+  notes: string[];
+}
+
 export interface FlowerPreset {
   id: string;
   name: string;
@@ -96,6 +135,8 @@ export interface FlowerPreset {
   morphology: FlowerMorphology;
   /** Optional for backward compatibility with previously exported custom presets. */
   growth?: BloomGrowthProfile;
+  /** Optional for backward compatibility with previously exported custom presets. */
+  architecture?: BotanicalArchitecture;
   sources: ResearchSource[];
 }
 
@@ -111,6 +152,20 @@ export interface RenderSettings {
 }
 
 export type SceneMode = 'specimen' | 'field';
+
+/** Overrides attached to one deterministic field index. Values use botanical units. */
+export interface IndividualFlowerSettings {
+  presetId?: string;
+  heightCm?: number;
+  flowerDiameterCm?: number;
+  headTiltDeg?: number;
+  headAzimuthDeg?: number;
+  pedicelLengthCm?: number;
+  leafScale?: number;
+  leafCount?: number;
+  branchCount?: number;
+  branchAngleDeg?: number;
+}
 
 export interface FieldSettings {
   /** Number of individual flowering plants in the field. */
@@ -129,6 +184,8 @@ export interface FieldSettings {
   seed: number;
   /** Presets participating in the field mixture. */
   speciesIds: string[];
+  /** Per-index settings retained across deterministic field rebuilds. */
+  individuals: Record<string, IndividualFlowerSettings>;
 }
 
 export interface AppState {

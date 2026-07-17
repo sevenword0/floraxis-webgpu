@@ -92,6 +92,7 @@ export class BloomRenderer {
   private subject?: Bloomable;
   private sceneMode: SceneMode = 'specimen';
   private fieldRadius = 6.5;
+  private fieldHeight = 3.2;
   private readonly specimenStage = new THREE.Group();
   private fieldGround?: THREE.Mesh;
   private bloomProgress = 0;
@@ -325,11 +326,13 @@ export class BloomRenderer {
     const changedMode = this.sceneMode !== 'field';
     this.fieldRadius = settings.radius;
     this.subject?.dispose();
-    this.subject = new FlowerField(settings, presets);
+    const field = new FlowerField(settings, presets);
+    this.fieldHeight = field.maxHeight;
+    this.subject = field;
     this.scene.add(this.subject.root);
     this.subject.update(this.bloomProgress, performance.now());
     this.setSceneMode('field');
-    if (changedMode) this.focusField(settings.radius);
+    if (changedMode) this.focusField(settings.radius, this.fieldHeight);
   }
 
   setBloom(progress: number): void {
@@ -381,25 +384,26 @@ export class BloomRenderer {
     this.controls.update();
   }
 
-  focusField(radius: number): void {
+  focusField(radius: number, fieldHeight = this.fieldHeight): void {
     const safeRadius = Math.min(10, Math.max(2.5, radius));
-    const targetY = 0.72;
+    const safeHeight = Math.min(7, Math.max(1.2, fieldHeight));
+    const targetY = Math.min(2.2, safeHeight * 0.34);
     const narrowScale = this.width / Math.max(1, this.height) < 0.72 ? 1.2 : 1;
     this.camera.position.set(
       safeRadius * 1.55 * narrowScale,
-      (safeRadius * 1.15 + 3.8) * narrowScale,
+      (safeRadius * 1.05 + safeHeight * 0.62 + 2.4) * narrowScale,
       safeRadius * 2 * narrowScale,
     );
     this.controls.target.set(0, targetY, 0);
     this.controls.minDistance = 4;
-    this.controls.maxDistance = 30;
+    this.controls.maxDistance = 36;
     this.controls.maxPolarAngle = Math.PI * 0.48;
-    this.setShadowExtent(safeRadius + 2.2, safeRadius + 4.5);
+    this.setShadowExtent(safeRadius + 2.2, Math.max(safeRadius + 4.5, safeHeight + 2));
     this.controls.update();
   }
 
   focusScene(): void {
-    if (this.sceneMode === 'field') this.focusField(this.fieldRadius);
+    if (this.sceneMode === 'field') this.focusField(this.fieldRadius, this.fieldHeight);
     else this.focusFlower();
   }
 

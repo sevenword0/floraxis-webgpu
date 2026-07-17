@@ -1,11 +1,19 @@
 import * as THREE from 'three/webgpu';
 import type { Bloomable, BloomGrowthProfile, FieldSettings, FlowerPreset } from '../types';
+import { resolveBotanicalArchitecture } from '../data/botanical-architecture';
 import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } from '../growth-model';
 import { remapBloom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
-import { evaluateFieldBloom, generateFieldLayout, type FieldLod, type FieldPlant } from './flower-field-layout';
+import { createLeafGeometry } from './leaf-geometry';
+import {
+  botanicalLengthToWorld,
+  evaluateFieldBloom,
+  generateFieldLayout,
+  type FieldLod,
+  type FieldPlant,
+} from './flower-field-layout';
 
 interface FieldPetalSpec {
   angle: number;
@@ -51,13 +59,30 @@ interface FieldSepalInstance {
   spec: FieldSepalSpec;
 }
 
+interface FieldBranchInstance {
+  plant: FieldPlant;
+  slot: number;
+}
+
+interface FieldLeafInstance {
+  plant: FieldPlant;
+  slot: number;
+  count: number;
+}
+
 interface SpeciesBatch {
   preset: FlowerPreset;
   growth: BloomGrowthProfile;
   plants: FieldPlant[];
   petals: FieldPetalInstance[];
   sepals: FieldSepalInstance[];
+  branches: FieldBranchInstance[];
+  leaves: FieldLeafInstance[];
   stemMesh: THREE.InstancedMesh;
+  pedicelMesh: THREE.InstancedMesh;
+  branchMesh?: THREE.InstancedMesh;
+  leafStemMesh?: THREE.InstancedMesh;
+  leafMesh?: THREE.InstancedMesh;
   centerMesh: THREE.InstancedMesh;
   petalMesh: THREE.InstancedMesh;
   petalMorphDriver: THREE.Mesh;
@@ -90,6 +115,16 @@ const minimumPetals = (preset: FlowerPreset): number => {
 const visiblePetalCount = (preset: FlowerPreset, lod: FieldLod): number => {
   const cap = Math.min(preset.morphology.petalCount, PETAL_CAPS[preset.id] ?? 18);
   return Math.max(minimumPetals(preset), Math.round(cap * LOD_FACTOR[lod]));
+};
+
+const visibleLeafCount = (plant: FieldPlant): number => {
+  const cap = plant.lod === 'near' ? 12 : plant.lod === 'mid' ? 8 : 5;
+  return Math.max(0, Math.min(cap, plant.leafCount));
+};
+
+const deployedHeadDiameter = (preset: FlowerPreset): number => {
+  const m = preset.morphology;
+  return Math.max(0.2, (m.headRadius + m.petalLength * (preset.kind === 'sunflower' ? 0.96 : 0.9)) * 2);
 };
 
 const distributePetals = (total: number, layers: number): number[] => {
@@ -128,6 +163,7 @@ const makeMorphTargetsRelative = (geometry: THREE.BufferGeometry): THREE.BufferG
 export class FlowerField implements Bloomable {
   readonly root = new THREE.Group();
   readonly petalCount: number;
+  readonly maxHeight: number;
 
   private readonly settings: FieldSettings;
   private readonly batches: SpeciesBatch[] = [];
@@ -141,12 +177,24 @@ export class FlowerField implements Bloomable {
   private readonly workMatrix = new THREE.Matrix4();
   private readonly direction = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
+  private readonly stemStart = new THREE.Vector3();
+  private readonly stemEnd = new THREE.Vector3();
+  private readonly headPosition = new THREE.Vector3();
+  private readonly headQuaternion = new THREE.Quaternion();
+  private readonly tiltQuaternion = new THREE.Quaternion();
+  private readonly yawQuaternion = new THREE.Quaternion();
+  private readonly right = new THREE.Vector3(1, 0, 0);
 
   constructor(settings: FieldSettings, presets: FlowerPreset[]) {
-    this.settings = { ...settings, speciesIds: [...settings.speciesIds] };
+    this.settings = {
+      ...settings,
+      speciesIds: [...settings.speciesIds],
+      individuals: Object.fromEntries(Object.entries(settings.individuals ?? {}).map(([key, value]) => [key, { ...value }])),
+    };
     this.root.name = 'preset-flower-field';
     const presetById = new Map(presets.map((preset) => [preset.id, preset]));
-    const plants = generateFieldLayout(settings, presets.map((preset) => preset.id));
+    const plants = generateFieldLayout(this.settings, presets);
+    this.maxHeight = Math.max(1, ...plants.map((plant) => plant.visualHeight + plant.matureRadius));
     const grouped = new Map<string, FieldPlant[]>();
     for (const plant of plants) {
       if (!presetById.has(plant.presetId)) continue;
@@ -267,6 +315,7 @@ export class FlowerField implements Bloomable {
   private buildSpeciesBatch(preset: FlowerPreset, plants: FieldPlant[]): SpeciesBatch {
     const m = preset.morphology;
     const growth = resolveGrowthProfile(preset);
+    const architecture = resolveBotanicalArchitecture(preset);
     const petalInstances: FieldPetalInstance[] = [];
     const specCache = new Map<FieldLod, FieldPetalSpec[]>();
     for (const plant of plants) {
@@ -280,10 +329,34 @@ export class FlowerField implements Bloomable {
 
     const sepalSpecs = this.createSepalSpecs(preset, growth);
     const sepalInstances = plants.flatMap((plant) => sepalSpecs.map((spec) => ({ plant, spec })));
+    const branchInstances = plants.flatMap((plant) =>
+      Array.from({ length: plant.branchCount }, (_, slot) => ({ plant, slot })));
+    const leafInstances = plants.flatMap((plant) => {
+      const count = visibleLeafCount(plant);
+      return Array.from({ length: count }, (_, slot) => ({ plant, slot, count }));
+    });
     const stemGeometry = this.track(new THREE.CylinderGeometry(0.72, 1, 1, 8, 2));
     stemGeometry.translate(0, 0.5, 0);
     const stemMaterial = this.track(new THREE.MeshStandardNodeMaterial({ color: preset.colors.stem, roughness: 0.9 }));
     const stemMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(stemGeometry, stemMaterial, plants.length));
+    const pedicelMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(stemGeometry, stemMaterial, plants.length));
+    let branchMesh: THREE.InstancedMesh | undefined;
+    if (branchInstances.length > 0) {
+      branchMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(stemGeometry, stemMaterial, branchInstances.length));
+    }
+    let leafStemMesh: THREE.InstancedMesh | undefined;
+    let leafMesh: THREE.InstancedMesh | undefined;
+    if (leafInstances.length > 0) {
+      leafStemMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(stemGeometry, stemMaterial, leafInstances.length));
+      const leafGeometry = this.track(createLeafGeometry(architecture.leafShape));
+      const leafColor = new THREE.Color(preset.colors.stem).lerp(new THREE.Color('#7ca26a'), 0.28);
+      const leafMaterial = this.track(new THREE.MeshStandardNodeMaterial({
+        color: leafColor,
+        roughness: 0.82,
+        side: THREE.DoubleSide,
+      }));
+      leafMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(leafGeometry, leafMaterial, leafInstances.length));
+    }
 
     const centreGeometry = preset.kind === 'sunflower'
       ? this.track(new THREE.CylinderGeometry(m.headRadius, m.headRadius * 0.88, 0.18, 28))
@@ -350,7 +423,13 @@ export class FlowerField implements Bloomable {
       plants,
       petals: petalInstances,
       sepals: sepalInstances,
+      branches: branchInstances,
+      leaves: leafInstances,
       stemMesh,
+      pedicelMesh,
+      branchMesh,
+      leafStemMesh,
+      leafMesh,
       centerMesh,
       petalMesh,
       petalMorphDriver,
@@ -359,38 +438,70 @@ export class FlowerField implements Bloomable {
     };
   }
 
-  private setHeadMatrix(batch: SpeciesBatch, plant: FieldPlant, time: number, localBloom: number): void {
-    const m = batch.preset.morphology;
-    const stemHeight = m.stemHeight * plant.stemScale * plant.scale;
+  private resolveHeadPose(batch: SpeciesBatch, plant: FieldPlant, time: number, localBloom: number): number {
     const wind = Math.min(1.4, Math.max(0, this.settings.wind));
     const pulse = time * 0.00058;
+    const sunflowerLock = batch.preset.kind === 'sunflower' ? smoothstep(0.34, 0.68, localBloom) : 1;
+    const trackedAzimuth = plant.headAzimuthDeg * DEG + Math.sin(time * 0.00012 + plant.windPhase) * 0.62;
+    const lockedAzimuth = plant.headAzimuthDeg * DEG;
+    const yaw = THREE.MathUtils.lerp(trackedAzimuth, lockedAzimuth, sunflowerLock);
+    const tilt = Math.max(0, plant.headTiltDeg - (batch.preset.kind === 'sunflower' ? (1 - sunflowerLock) * 18 : 0)) * DEG;
+    const verticalPedicel = Math.cos(tilt) * plant.pedicelWorld;
+    const stemHeight = Math.max(0.16, plant.visualHeight - verticalPedicel);
     const swayX = Math.sin(pulse + plant.windPhase) * wind * stemHeight * 0.034;
     const swayZ = Math.cos(pulse * 0.83 + plant.windPhase * 1.31) * wind * stemHeight * 0.025;
 
-    this.transform.position.set(plant.x + swayX, stemHeight, plant.z + swayZ);
-    this.transform.rotation.set(swayZ / Math.max(0.3, stemHeight) * 0.65, plant.yaw, -swayX / Math.max(0.3, stemHeight) * 0.65);
-    const headScale = plant.scale * m.flowerScale * evaluateHeadGrowth(batch.growth, localBloom);
+    this.stemStart.set(plant.x, 0, plant.z);
+    this.stemEnd.set(plant.x + swayX * 0.72, stemHeight, plant.z + swayZ * 0.72);
+    this.direction.set(Math.sin(yaw) * Math.sin(tilt), Math.cos(tilt), Math.cos(yaw) * Math.sin(tilt));
+    this.headPosition.copy(this.stemEnd).addScaledVector(this.direction, plant.pedicelWorld);
+    this.yawQuaternion.setFromAxisAngle(this.up, yaw);
+    this.tiltQuaternion.setFromAxisAngle(this.right, tilt);
+    this.headQuaternion.copy(this.yawQuaternion).multiply(this.tiltQuaternion);
+    return stemHeight;
+  }
+
+  private stemRadius(batch: SpeciesBatch, plant: FieldPlant): number {
+    const m = batch.preset.morphology;
+    return m.stemRadius * THREE.MathUtils.clamp(plant.visualHeight / Math.max(0.3, m.stemHeight), 0.38, 2.3);
+  }
+
+  private setCylinderBetween(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    radius: number,
+  ): void {
+    this.direction.copy(end).sub(start);
+    const length = Math.max(0.001, this.direction.length());
+    this.transform.position.copy(start);
+    this.transform.quaternion.setFromUnitVectors(this.up, this.direction.normalize());
+    this.transform.scale.set(radius, length, radius);
+    this.transform.updateMatrix();
+    mesh.setMatrixAt(index, this.transform.matrix);
+  }
+
+  private setHeadMatrix(batch: SpeciesBatch, plant: FieldPlant, time: number, localBloom: number): void {
+    const m = batch.preset.morphology;
+    this.resolveHeadPose(batch, plant, time, localBloom);
+
+    this.transform.position.copy(this.headPosition);
+    this.transform.quaternion.copy(this.headQuaternion);
+    const sizeScale = plant.visualFlowerDiameter / deployedHeadDiameter(batch.preset);
+    const headScale = sizeScale * m.flowerScale * evaluateHeadGrowth(batch.growth, localBloom);
     this.transform.scale.setScalar(headScale);
     this.transform.updateMatrix();
     this.headMatrix.copy(this.transform.matrix);
   }
 
   private updatePlantMeshes(batch: SpeciesBatch, time: number): void {
-    const m = batch.preset.morphology;
     batch.plants.forEach((plant, index) => {
       const localBloom = evaluateFieldBloom(this.currentProgress, plant.bloomDelay);
-      const stemHeight = m.stemHeight * plant.stemScale * plant.scale;
-      const wind = Math.min(1.4, Math.max(0, this.settings.wind));
-      const pulse = time * 0.00058;
-      const swayX = Math.sin(pulse + plant.windPhase) * wind * stemHeight * 0.034;
-      const swayZ = Math.cos(pulse * 0.83 + plant.windPhase * 1.31) * wind * stemHeight * 0.025;
-      this.direction.set(swayX, stemHeight, swayZ);
-      const length = this.direction.length();
-      this.transform.position.set(plant.x, 0, plant.z);
-      this.transform.quaternion.setFromUnitVectors(this.up, this.direction.normalize());
-      this.transform.scale.set(m.stemRadius * plant.scale, length, m.stemRadius * plant.scale);
-      this.transform.updateMatrix();
-      batch.stemMesh.setMatrixAt(index, this.transform.matrix);
+      this.resolveHeadPose(batch, plant, time, localBloom);
+      const radius = this.stemRadius(batch, plant);
+      this.setCylinderBetween(batch.stemMesh, index, this.stemStart, this.stemEnd, radius);
+      this.setCylinderBetween(batch.pedicelMesh, index, this.stemEnd, this.headPosition, radius * 0.66);
 
       this.setHeadMatrix(batch, plant, time, localBloom);
       const reveal = evaluateReproductiveReveal(batch.growth, localBloom);
@@ -402,8 +513,114 @@ export class FlowerField implements Bloomable {
       this.workMatrix.multiplyMatrices(this.headMatrix, this.transform.matrix);
       batch.centerMesh.setMatrixAt(index, this.workMatrix);
     });
+
+    if (batch.branchMesh) {
+      const architecture = resolveBotanicalArchitecture(batch.preset);
+      const habitLength = architecture.stemHabit === 'woody-branch'
+        ? 0.34
+        : architecture.stemHabit === 'shrub' ? 0.22 : 0.14;
+      batch.branches.forEach(({ plant, slot }, index) => {
+        const localBloom = evaluateFieldBloom(this.currentProgress, plant.bloomDelay);
+        const stemHeight = this.resolveHeadPose(batch, plant, time, localBloom);
+        const ratio = 0.26 + (slot + 1) / (plant.branchCount + 1) * 0.56;
+        const angle = plant.yaw + slot * GOLDEN_ANGLE;
+        const branchAngle = plant.branchAngleDeg * DEG;
+        const length = plant.visualHeight * habitLength * (0.82 + (slot % 3) * 0.09);
+        this.stemStart.set(
+          THREE.MathUtils.lerp(plant.x, this.stemEnd.x, ratio),
+          stemHeight * ratio,
+          THREE.MathUtils.lerp(plant.z, this.stemEnd.z, ratio),
+        );
+        this.stemEnd.set(
+          this.stemStart.x + Math.sin(angle) * Math.sin(branchAngle) * length,
+          this.stemStart.y + Math.cos(branchAngle) * length,
+          this.stemStart.z + Math.cos(angle) * Math.sin(branchAngle) * length,
+        );
+        this.setCylinderBetween(batch.branchMesh!, index, this.stemStart, this.stemEnd, this.stemRadius(batch, plant) * 0.54);
+      });
+      batch.branchMesh.instanceMatrix.needsUpdate = true;
+    }
     batch.stemMesh.instanceMatrix.needsUpdate = true;
+    batch.pedicelMesh.instanceMatrix.needsUpdate = true;
     batch.centerMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private updateLeaves(batch: SpeciesBatch, time: number): void {
+    if (!batch.leafMesh || !batch.leafStemMesh) return;
+    const architecture = resolveBotanicalArchitecture(batch.preset);
+    batch.leaves.forEach(({ plant, slot, count }, index) => {
+      const localBloom = evaluateFieldBloom(this.currentProgress, plant.bloomDelay);
+      const stemHeight = this.resolveHeadPose(batch, plant, time, localBloom);
+      const stemTopX = this.stemEnd.x;
+      const stemTopZ = this.stemEnd.z;
+      let angle = plant.yaw + slot * GOLDEN_ANGLE;
+      const lengthWorld = botanicalLengthToWorld(architecture.leafLengthCm) * plant.leafScale;
+      const widthWorld = botanicalLengthToWorld(architecture.leafWidthCm) * plant.leafScale;
+      let tilt = -0.58;
+      let ratio = 0.24 + slot / Math.max(1, count - 1) * 0.5;
+
+      if (architecture.leafArrangement === 'basal') {
+        ratio = 0.06 + slot / Math.max(1, count) * 0.12;
+        tilt = -1.02;
+      } else if (architecture.leafArrangement === 'clustered') {
+        ratio = 0.62 + slot / Math.max(1, count) * 0.25;
+        tilt = -0.62;
+      } else if (architecture.leafArrangement === 'whorled') {
+        ratio = 0.18 + slot / Math.max(1, count - 1) * 0.64;
+        tilt = -0.48;
+      }
+
+      if (architecture.leafArrangement === 'separate-petiole') {
+        const reach = plant.visualHeight * (0.18 + slot * 0.055);
+        this.stemStart.set(plant.x, 0, plant.z);
+        this.stemEnd.set(
+          plant.x + Math.sin(angle) * reach,
+          plant.visualHeight * (0.42 + slot * 0.1),
+          plant.z + Math.cos(angle) * reach,
+        );
+        tilt = 0.04 + Math.sin(slot * 2.1) * 0.04;
+      } else if (architecture.leafArrangement === 'clustered' && plant.branchCount > 0) {
+        const branchSlot = slot % plant.branchCount;
+        const branchRatio = 0.26 + (branchSlot + 1) / (plant.branchCount + 1) * 0.56;
+        angle = plant.yaw + branchSlot * GOLDEN_ANGLE;
+        const branchAngle = plant.branchAngleDeg * DEG;
+        const branchLength = plant.visualHeight * 0.34 * (0.82 + (branchSlot % 3) * 0.09);
+        const branchBaseX = THREE.MathUtils.lerp(plant.x, stemTopX, branchRatio);
+        const branchBaseZ = THREE.MathUtils.lerp(plant.z, stemTopZ, branchRatio);
+        this.stemStart.set(
+          branchBaseX + Math.sin(angle) * Math.sin(branchAngle) * branchLength,
+          stemHeight * branchRatio + Math.cos(branchAngle) * branchLength,
+          branchBaseZ + Math.cos(angle) * Math.sin(branchAngle) * branchLength,
+        );
+        const petiole = Math.max(0.025, Math.min(0.18, widthWorld * 0.58));
+        this.stemEnd.set(
+          this.stemStart.x + Math.sin(angle) * petiole,
+          this.stemStart.y + petiole * 0.2,
+          this.stemStart.z + Math.cos(angle) * petiole,
+        );
+      } else {
+        this.stemStart.set(
+          THREE.MathUtils.lerp(plant.x, stemTopX, ratio),
+          stemHeight * ratio,
+          THREE.MathUtils.lerp(plant.z, stemTopZ, ratio),
+        );
+        const petiole = Math.max(0.025, Math.min(0.16, widthWorld * 0.52));
+        this.stemEnd.set(
+          this.stemStart.x + Math.sin(angle) * petiole,
+          this.stemStart.y + petiole * 0.18,
+          this.stemStart.z + Math.cos(angle) * petiole,
+        );
+      }
+
+      this.setCylinderBetween(batch.leafStemMesh!, index, this.stemStart, this.stemEnd, this.stemRadius(batch, plant) * 0.22);
+      this.transform.position.copy(this.stemEnd);
+      this.transform.rotation.set(tilt, angle, Math.sin(slot * 2.47) * 0.08, 'YXZ');
+      this.transform.scale.set(Math.max(0.025, widthWorld), 1, Math.max(0.04, lengthWorld));
+      this.transform.updateMatrix();
+      batch.leafMesh!.setMatrixAt(index, this.transform.matrix);
+    });
+    batch.leafStemMesh.instanceMatrix.needsUpdate = true;
+    batch.leafMesh.instanceMatrix.needsUpdate = true;
   }
 
   private updatePetals(batch: SpeciesBatch, time: number): void {
@@ -494,6 +711,7 @@ export class FlowerField implements Bloomable {
     this.currentProgress = Math.min(1, Math.max(0, progress));
     for (const batch of this.batches) {
       this.updatePlantMeshes(batch, time);
+      this.updateLeaves(batch, time);
       this.updatePetals(batch, time);
       this.updateSepals(batch, time);
     }

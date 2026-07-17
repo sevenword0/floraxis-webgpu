@@ -140,6 +140,24 @@ input[type="range"]::-moz-range-thumb { width: 8px; height: 8px; border: 2px sol
 .seed-row button { padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; color: #c4d1ca; background: rgba(255,255,255,.035); font-size: 8px; cursor: pointer; }
 .seed-row button:hover { border-color: var(--accent); color: #fff; }
 .field-lod-note { margin: 11px 0 0; color: #65786f; font-size: 8px; line-height: 1.55; word-break: keep-all; }
+.individual-picker { display: grid; grid-template-columns: 30px auto 1fr 30px; align-items: center; gap: 6px; margin-bottom: 9px; }
+.individual-picker label { color: #899a92; font-size: 8px; }
+.individual-picker input, .individual-picker button, .individual-species-row select { min-width: 0; height: 31px; border: 1px solid var(--line); border-radius: 7px; color: #d6e2dc; background: #111c18; font: 600 8px monospace; }
+.individual-picker input { width: 100%; padding: 0 7px; }
+.individual-picker button { cursor: pointer; background: rgba(255,255,255,.035); }
+.individual-picker button:hover { border-color: var(--accent); color: #fff; }
+.individual-species-row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px; margin-bottom: 9px; color: #899a92; font-size: 8px; }
+.individual-species-row select { width: 100%; padding: 0 7px; }
+.individual-card { margin-bottom: 14px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); border-radius: 9px; background: linear-gradient(135deg, var(--accent-soft), rgba(255,255,255,.015)); }
+.individual-card strong { display: block; color: #eef5f1; font-size: 11px; }
+.individual-card small { display: block; margin: 3px 0 8px; color: #8ba097; font: italic 9px Georgia, serif; }
+.individual-card div { display: flex; flex-wrap: wrap; gap: 4px; }
+.individual-card span { padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; color: #aabbb3; font-size: 7px; }
+.individual-structure-note { margin: 0; color: #8c9e95; font-size: 8px; line-height: 1.55; word-break: keep-all; }
+.individual-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 11px; }
+.individual-actions button { min-height: 30px; padding: 6px; border: 1px solid var(--line); border-radius: 7px; color: #afbeb7; background: rgba(255,255,255,.025); font-size: 8px; cursor: pointer; }
+.individual-actions button:hover { border-color: var(--accent); color: #fff; }
+.individual-actions #individual-reset { grid-column: 1 / -1; color: #899a92; }
 
 .select-row { display: grid; grid-template-columns: 1.25fr 1fr; gap: 8px; margin-bottom: 11px; }
 .select-row label { color: #81928a; font-size: 8px; }

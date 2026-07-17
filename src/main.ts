@@ -1,8 +1,29 @@
 import './style.css';
 import { DEFAULT_PRESET, PRESETS } from './data/presets';
+import {
+  HEAD_FACING_LABEL,
+  LEAF_SHAPE_LABEL,
+  STEM_HABIT_LABEL,
+  resolveBotanicalArchitecture,
+  sanitizeIndividualFlowerSettings,
+} from './data/botanical-architecture';
+import {
+  exportIndividualFlower,
+  generateFieldLayout,
+  parseIndividualFlowerExport,
+  type FieldPlant,
+} from './flower/flower-field-layout';
 import { resolveGrowthProfile } from './growth-model';
 import { BloomRenderer } from './render/bloom-renderer';
-import type { AppState, BloomGrowthProfile, FieldSettings, FlowerPreset, RenderSettings, SceneMode } from './types';
+import type {
+  AppState,
+  BloomGrowthProfile,
+  FieldSettings,
+  FlowerPreset,
+  IndividualFlowerSettings,
+  RenderSettings,
+  SceneMode,
+} from './types';
 import {
   BLOOM_STAGES,
   clamp01,
@@ -42,6 +63,7 @@ const DEFAULT_FIELD: FieldSettings = {
   wind: 0.36,
   seed: 240617,
   speciesIds: PRESETS.map((preset) => preset.id),
+  individuals: {},
 };
 
 const state: AppState = {
@@ -53,7 +75,7 @@ const state: AppState = {
   direction: 1,
   speed: 1,
   render: { ...DEFAULT_RENDER },
-  field: { ...DEFAULT_FIELD, speciesIds: [...DEFAULT_FIELD.speciesIds] },
+  field: { ...DEFAULT_FIELD, speciesIds: [...DEFAULT_FIELD.speciesIds], individuals: {} },
 };
 
 const host = qs<HTMLElement>('#render-host');
@@ -74,6 +96,9 @@ let rebuildTimer = 0;
 let fieldRebuildTimer = 0;
 let refocusFieldAfterRebuild = false;
 let lastStatsUpdate = 0;
+let selectedFlowerIndex = 0;
+
+type FieldNumericKey = 'count' | 'radius' | 'spacing' | 'bloomWave' | 'bloomVariance' | 'wind';
 
 try {
   const stored = localStorage.getItem('floraxis:custom-preset');
@@ -167,8 +192,8 @@ const updateRangeVisual = (input: HTMLInputElement): void => {
 
 const updateFieldUI = (): void => {
   qsa<HTMLInputElement>('[data-field]').forEach((input) => {
-    const key = input.dataset.field as Exclude<keyof FieldSettings, 'speciesIds'>;
-    const value = state.field[key];
+    const key = input.dataset.field as FieldNumericKey;
+    const value = Number(state.field[key]);
     input.value = String(value);
     updateRangeVisual(input);
     const output = qs<HTMLOutputElement>(`[data-field-output="${key}"]`);
@@ -182,6 +207,130 @@ const updateFieldUI = (): void => {
   });
   qs<HTMLElement>('#field-summary-count').textContent = String(state.field.count);
   qs<HTMLElement>('#field-summary-species').textContent = String(state.field.speciesIds.length);
+  selectedFlowerIndex = Math.min(Math.max(0, selectedFlowerIndex), Math.max(0, state.field.count - 1));
+  updateIndividualFlowerUI();
+};
+
+const getFieldPlants = (): FieldPlant[] => generateFieldLayout(state.field, PRESETS);
+
+const getSelectedFlower = (): FieldPlant => {
+  const plants = getFieldPlants();
+  selectedFlowerIndex = Math.min(Math.max(0, selectedFlowerIndex), Math.max(0, plants.length - 1));
+  return plants[selectedFlowerIndex];
+};
+
+const fullIndividualSettings = (plant: FieldPlant): Required<IndividualFlowerSettings> =>
+  exportIndividualFlower(plant).settings;
+
+const updateIndividualFlowerUI = (): void => {
+  const plant = getSelectedFlower();
+  const preset = PRESETS.find((item) => item.id === plant.presetId) ?? PRESETS[0];
+  const architecture = resolveBotanicalArchitecture(preset);
+  const indexInput = qs<HTMLInputElement>('#individual-index');
+  indexInput.max = String(state.field.count);
+  indexInput.value = String(plant.index + 1);
+  qs<HTMLSelectElement>('#individual-species').value = plant.presetId;
+  qs<HTMLElement>('#individual-name').textContent = `${preset.name} #${String(plant.index + 1).padStart(3, '0')}`;
+  qs<HTMLElement>('#individual-scientific').textContent = preset.scientificName;
+  qs<HTMLElement>('#individual-facing').textContent = `${HEAD_FACING_LABEL[architecture.headFacing]} · ${Math.round(plant.headTiltDeg)}°`;
+  qs<HTMLElement>('#individual-habit').textContent = STEM_HABIT_LABEL[architecture.stemHabit];
+  qs<HTMLElement>('#individual-leaf-shape').textContent = LEAF_SHAPE_LABEL[architecture.leafShape];
+  qs<HTMLElement>('#individual-structure-note').textContent = architecture.notes.join(' · ');
+
+  qsa<HTMLInputElement>('[data-individual]').forEach((input) => {
+    const key = input.dataset.individual as keyof IndividualFlowerSettings;
+    const value = plant[key as keyof FieldPlant];
+    if (typeof value !== 'number') return;
+    input.value = String(Number(value.toFixed(3)));
+    updateRangeVisual(input);
+    const output = qs<HTMLOutputElement>(`[data-individual-output="${key}"]`);
+    const unit = input.dataset.unit ?? '';
+    output.value = `${Number.isInteger(Number(input.step)) ? Math.round(value) : Number(value.toFixed(2))}${unit}`;
+  });
+};
+
+const writeClipboardText = async (value: string): Promise<void> => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  textarea.remove();
+};
+
+const applyIndividualFlowerSettings = (settings: IndividualFlowerSettings): void => {
+  const preset = PRESETS.find((item) => item.id === settings.presetId) ?? PRESETS[0];
+  state.field.individuals[String(selectedFlowerIndex)] = sanitizeIndividualFlowerSettings(settings, preset);
+  updateIndividualFlowerUI();
+  scheduleFieldRebuild();
+};
+
+const selectIndividualSpecies = (presetId: string): void => {
+  const preset = PRESETS.find((item) => item.id === presetId) ?? PRESETS[0];
+  const architecture = resolveBotanicalArchitecture(preset);
+  applyIndividualFlowerSettings({
+    presetId: preset.id,
+    heightCm: architecture.defaultHeightCm,
+    flowerDiameterCm: architecture.defaultFlowerDiameterCm,
+    headTiltDeg: architecture.headTiltDeg,
+    headAzimuthDeg: architecture.headAzimuthDeg ?? getSelectedFlower().headAzimuthDeg,
+    pedicelLengthCm: architecture.pedicelLengthCm,
+    leafScale: 1,
+    leafCount: architecture.leafCount,
+    branchCount: architecture.branchCount,
+    branchAngleDeg: architecture.branchAngleDeg,
+  });
+};
+
+const copyIndividualFlower = async (): Promise<void> => {
+  try {
+    await writeClipboardText(JSON.stringify(exportIndividualFlower(getSelectedFlower()), null, 2));
+    showToast('선택한 꽃 설정을 클립보드에 복사했습니다.');
+  } catch {
+    showToast('클립보드 권한을 사용할 수 없습니다. JSON 파일 저장을 이용해 주세요.');
+  }
+};
+
+const pasteIndividualFlower = async (): Promise<void> => {
+  try {
+    const parsed = JSON.parse(await navigator.clipboard.readText()) as unknown;
+    const settings = parseIndividualFlowerExport(parsed);
+    if (!settings) throw new Error('invalid individual flower');
+    applyIndividualFlowerSettings(settings);
+    showToast(`클립보드 설정을 꽃 #${selectedFlowerIndex + 1}에 적용했습니다.`);
+  } catch {
+    showToast('Floraxis 개별 꽃 JSON을 클립보드에서 읽지 못했습니다.');
+  }
+};
+
+const exportIndividualFlowerFile = (): void => {
+  const plant = getSelectedFlower();
+  const payload = exportIndividualFlower(plant);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `floraxis-flower-${String(plant.index + 1).padStart(3, '0')}-${plant.presetId}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('선택한 꽃을 복제 가능한 JSON 파일로 저장했습니다.');
+};
+
+const importIndividualFlowerFile = async (file: File): Promise<void> => {
+  try {
+    const settings = parseIndividualFlowerExport(JSON.parse(await file.text()) as unknown);
+    if (!settings) throw new Error('invalid individual flower');
+    applyIndividualFlowerSettings(settings);
+    showToast(`파일 설정을 꽃 #${selectedFlowerIndex + 1}에 적용했습니다.`);
+  } catch {
+    showToast('올바른 Floraxis 개별 꽃 JSON 파일이 아닙니다.');
+  }
 };
 
 const updateModeUI = (): void => {
@@ -227,6 +376,7 @@ const updateMorphologyUI = (): void => {
 
 const updateResearchUI = (): void => {
   const growth = resolveGrowthProfile(state.preset);
+  const architecture = resolveBotanicalArchitecture(state.preset);
   qs<HTMLElement>('#research-title').textContent = `${state.preset.name} · 개화 연구 노트`;
   qs<HTMLElement>('#research-mechanism').textContent = state.preset.bloomMechanism;
   qs<HTMLElement>('#research-structure').replaceChildren(...state.preset.structure.map((item) => {
@@ -239,6 +389,10 @@ const updateResearchUI = (): void => {
     ['꽃잎 길이', `${Math.round(growth.closedPetalLength * 100)} → 100%`],
     ['꽃잎 너비', `${Math.round(growth.closedPetalWidth * 100)} → 100%`],
     ['기관 배치', growth.arrangement],
+    ['실제 높이', `${architecture.heightRangeCm[0]}–${architecture.heightRangeCm[1]} cm`],
+    ['꽃 지름', `${architecture.flowerDiameterRangeCm[0]}–${architecture.flowerDiameterRangeCm[1]} cm`],
+    ['화두 방향', `${HEAD_FACING_LABEL[architecture.headFacing]} · ${architecture.headTiltDeg}°`],
+    ['잎·줄기', `${LEAF_SHAPE_LABEL[architecture.leafShape]} · ${STEM_HABIT_LABEL[architecture.stemHabit]}`],
   ];
   qs<HTMLElement>('#research-growth').replaceChildren(...growthMetrics.map(([label, value]) => {
     const item = document.createElement('div');
@@ -249,7 +403,7 @@ const updateResearchUI = (): void => {
     item.append(title, output);
     return item;
   }));
-  qs<HTMLElement>('#research-evidence').replaceChildren(...growth.observations.map((observation) => {
+  qs<HTMLElement>('#research-evidence').replaceChildren(...[...growth.observations, ...architecture.notes].map((observation) => {
     const li = document.createElement('li');
     li.textContent = observation;
     return li;
@@ -510,7 +664,7 @@ const wireEvents = (): void => {
 
   qsa<HTMLInputElement>('[data-field]').forEach((input) => {
     input.addEventListener('input', () => {
-      const key = input.dataset.field as Exclude<keyof FieldSettings, 'speciesIds'>;
+      const key = input.dataset.field as FieldNumericKey;
       const nextValue = key === 'count' ? Math.round(Number(input.value)) : Number(input.value);
       (state.field as unknown as Record<string, number>)[key] = nextValue;
       updateFieldUI();
@@ -528,6 +682,44 @@ const wireEvents = (): void => {
     updateFieldUI();
     scheduleFieldRebuild();
     showToast(`새 배치 시드 ${state.field.seed}를 적용했습니다.`);
+  });
+
+  const selectFlowerIndex = (next: number): void => {
+    selectedFlowerIndex = Math.min(state.field.count - 1, Math.max(0, Math.round(next)));
+    updateIndividualFlowerUI();
+  };
+  qs<HTMLInputElement>('#individual-index').addEventListener('change', (event) => {
+    selectFlowerIndex(Number((event.currentTarget as HTMLInputElement).value) - 1);
+  });
+  qs<HTMLButtonElement>('#individual-prev').addEventListener('click', () => selectFlowerIndex(selectedFlowerIndex - 1));
+  qs<HTMLButtonElement>('#individual-next').addEventListener('click', () => selectFlowerIndex(selectedFlowerIndex + 1));
+  qs<HTMLSelectElement>('#individual-species').addEventListener('change', (event) => {
+    selectIndividualSpecies((event.currentTarget as HTMLSelectElement).value);
+  });
+  qsa<HTMLInputElement>('[data-individual]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const plant = getSelectedFlower();
+      const settings = fullIndividualSettings(plant);
+      const key = input.dataset.individual as keyof IndividualFlowerSettings;
+      (settings as unknown as Record<string, number>)[key] = Number(input.value);
+      applyIndividualFlowerSettings(settings);
+    });
+  });
+  qs<HTMLButtonElement>('#individual-copy').addEventListener('click', () => void copyIndividualFlower());
+  qs<HTMLButtonElement>('#individual-paste').addEventListener('click', () => void pasteIndividualFlower());
+  qs<HTMLButtonElement>('#individual-export').addEventListener('click', exportIndividualFlowerFile);
+  qs<HTMLButtonElement>('#individual-import').addEventListener('click', () => qs<HTMLInputElement>('#individual-import-file').click());
+  qs<HTMLInputElement>('#individual-import-file').addEventListener('change', (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) void importIndividualFlowerFile(file);
+    input.value = '';
+  });
+  qs<HTMLButtonElement>('#individual-reset').addEventListener('click', () => {
+    delete state.field.individuals[String(selectedFlowerIndex)];
+    updateIndividualFlowerUI();
+    scheduleFieldRebuild();
+    showToast(`꽃 #${selectedFlowerIndex + 1}을 종 기본값으로 되돌렸습니다.`);
   });
 
   customCard.addEventListener('click', () => {

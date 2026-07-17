@@ -67,6 +67,34 @@ Helianthus annuus의 머리는 50–100개 설상화와 최대 약 1000개 통�
 - [Are capitula inflorescences? A reassessment based on flower-like meristem identity and ray flower development](https://academic.oup.com/aob/article/137/1/47/8195846)
 - [Quantifying the reproductive progression of sunflower using FIJI](https://pmc.ncbi.nlm.nih.gov/articles/PMC9587322/)
 
+## 실제 치수·꽃 방향·영양기관 구조
+
+꽃밭 모드의 개별 꽃 값은 cm 단위 원자료 범위 안에서 생성한다. 한 장면에 10 m급 교목과 수십 cm 초본을 함께 놓을 수 있도록 초본 높이는 비례 축척을 유지하고 320 cm를 넘는 교목만 로그 압축한다. 꽃 지름은 기관을 식별할 수 있도록 2배 세부 확대하지만, 편집·내보내기·충돌 판정에는 확대 전 실측값을 보존한다.
+
+| 종 | 적용한 실제 범위 | 기본 꽃머리 방향 | 줄기·수형·잎 대응 |
+| --- | --- | --- | --- |
+| 다마스크 장미 | 높이 150–250 cm, 꽃 지름 최대 8 cm | 약한 측향 | 활 모양의 분지 관목, 우상복엽·톱니 소엽 |
+| 아펠도른 튤립 | 높이 10–50 cm, 꽃 지름 6.3–8.3 cm | 상향 | 분지 없는 단일 꽃대, 기부의 넓은 피침형 잎 |
+| 오리엔탈 백합 | 높이 90–150 cm, 꽃 지름 12.7–15.2 cm | 반직립–수평 측향 | 직립 유엽 줄기, 긴 꽃자루, 윤생·호생 피침형 잎 |
+| 왕벚나무 | 높이 914–1219 cm | 가지 끝 측향 | 넓고 열린 교목 수관, 3–6송이 총상화서, 톱니 타원형 잎 |
+| 연꽃 | 높이 91–183 cm, 꽃 지름 20–30 cm | 상향 | 수중 근경에서 올라오는 꽃대, 별도 엽병의 방패형 원형 잎 |
+| 해바라기 | 높이 91–305 cm, 머리 지름 7.6–15.2 cm | 개화 시 동향·준수평 | 굵은 직립 줄기, 난형·삼각형 톱니 잎 |
+
+백합의 머리 기울기는 UPOV의 직립, 직립–수평, 수평(외향), 하향 형질 등급을 수치 각도로 대응했다. 해바라기는 미성숙기 추적 운동 뒤 개화 시 동쪽을 향해 고정되고, 개화 당일 약 10° 고도에서 이후 처지는 관찰을 기본 방위와 기울기로 대응했다. 사용자가 모든 개체의 방향·크기·꽃자루·잎·가지를 다시 조정할 수 있다.
+
+완전 개화 충돌은 각 꽃머리를 지름과 기울기로 만든 3차원 타원체로 취급한다. 배치 단계에서 줄기 최소 간격을 먼저 확보한 뒤, 꽃자루와 바람 진폭을 더한 성숙 중심 사이의 침범을 반복 완화한다. 따라서 꽃봉오리가 팽창하고 머리가 옆으로 기울어도 기본 120개 꽃밭에서 꽃머리끼리 관통하지 않는다.
+
+- [RHS — Rosa × damascena](https://www.rhs.org.uk/plants/33926/rosa-x-damascena-d/details)
+- [RHS — Tulipa gesneriana](https://www.rhs.org.uk/plants/18512/tulipa-gesneriana/details)
+- [UPOV TG/59 — Lily flower attitude](https://www.upov.int/documents/d/upov/tg-documents-en-tg059.pdf)
+- [Missouri Botanical Garden — Oriental lily ‘Muscadet’](https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?basic=mu&isprofile=0&taxonid=244778)
+- [Kew Plants of the World Online — Lilium](https://powo.science.kew.org/taxon/urn%3Alsid%3Aipni.org%3Anames%3A30009317-2/general-information)
+- [Missouri Botanical Garden — Prunus × yedoensis](https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?bt=4&taxonid=286608)
+- [Missouri Botanical Garden — Nelumbo nucifera](https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?hf=3&isprofile=0&taxonid=282911)
+- [Missouri Botanical Garden — Helianthus annuus](https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?cv=5&isprofile=0&lo=1&taxonid=277199)
+- [Sunflower head orientation and pollinator visits](https://pmc.ncbi.nlm.nih.gov/articles/PMC7725789/)
+- [Dynamics of sunflower head orientation](https://pmc.ncbi.nlm.nih.gov/articles/PMC10168033/)
+
 ## 해석 한계
 
 이 구현은 논문에 보고된 형태학적 방향과 상대 순서를 보존하지만, 세포벽 탄성·팽압·호르몬 농도·온도장을 유한요소법으로 푸는 생물역학 해석은 아니다. 서로 다른 논문의 절대 수치는 직접 비교하지 않았고, 화면에서 기관이 식별되도록 비선형 완화와 종별 지연을 사용했다.
