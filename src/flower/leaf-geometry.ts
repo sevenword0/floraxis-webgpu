@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import type { LeafShape } from '../types';
+import { resolveBotanicalCurvature, sampleLeafBladeCurvature } from './botanical-curvature';
 
 interface MutableGeometryData {
   positions: number[];
@@ -41,10 +42,10 @@ const createCompoundPinnateData = (): MutableGeometryData => {
   pairs.forEach((z, pair) => {
     const width = 0.22 - pair * 0.025;
     const length = 0.24 - pair * 0.018;
-    addTriangleFan(data, -0.18, z, width, length, -0.58, 12);
-    addTriangleFan(data, 0.18, z, width, length, 0.58, 12);
+    addTriangleFan(data, -0.18, z, width, length, -0.58, 16);
+    addTriangleFan(data, 0.18, z, width, length, 0.58, 16);
   });
-  addTriangleFan(data, 0, 0.84, 0.24, 0.25, 0, 14);
+  addTriangleFan(data, 0, 0.84, 0.24, 0.25, 0, 18);
   return data;
 };
 
@@ -63,11 +64,21 @@ const createBladeData = (shape: Exclude<LeafShape, 'compound-pinnate' | 'peltate
     const t = row / segments;
     const width = bladeWidth(shape, t);
     const camber = Math.sin(Math.PI * t) * (shape === 'broad-lanceolate' ? 0.045 : 0.03);
-    data.positions.push(-width, camber - width * 0.035, t, width, camber + width * 0.035, t);
-    data.uvs.push(0, t, 1, t);
+    data.positions.push(
+      -width, camber - width * 0.035, t,
+      0, camber, t,
+      width, camber + width * 0.035, t,
+    );
+    data.uvs.push(0, t, 0.5, t, 1, t);
     if (row < segments) {
-      const a = row * 2;
-      data.indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      const a = row * 3;
+      const b = a + 3;
+      data.indices.push(
+        a, a + 1, b,
+        a + 1, b + 1, b,
+        a + 1, a + 2, b + 1,
+        a + 2, b + 2, b + 1,
+      );
     }
   }
   return data;
@@ -89,6 +100,25 @@ const createPeltateData = (): MutableGeometryData => {
   return data;
 };
 
+const applyLeafCurvature = (data: MutableGeometryData, shape: LeafShape): void => {
+  const profile = resolveBotanicalCurvature('upright', shape);
+  for (let index = 0; index < data.positions.length; index += 3) {
+    const x = data.positions[index];
+    const z = data.positions[index + 2];
+    if (shape === 'peltate-orbicular') {
+      const radial = Math.min(1, Math.hypot(x, z) / 0.5);
+      data.positions[index + 1] += profile.leafMidribArch * Math.sin(Math.PI * radial)
+        - profile.leafTipDroop * radial * radial
+        + profile.leafEdgeCup * Math.pow(radial, 3);
+      continue;
+    }
+
+    const progress = Math.min(1, Math.max(0, z));
+    const lateral = Math.min(1, Math.abs(x) / 0.5);
+    data.positions[index + 1] += sampleLeafBladeCurvature(profile, progress, lateral);
+  }
+};
+
 /** Creates a lightweight species-aware leaf or compound-leaf silhouette. */
 export const createLeafGeometry = (shape: LeafShape): THREE.BufferGeometry => {
   const data = shape === 'compound-pinnate'
@@ -96,6 +126,7 @@ export const createLeafGeometry = (shape: LeafShape): THREE.BufferGeometry => {
     : shape === 'peltate-orbicular'
       ? createPeltateData()
       : createBladeData(shape);
+  applyLeafCurvature(data, shape);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));

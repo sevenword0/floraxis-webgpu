@@ -38,7 +38,10 @@ describe('petal clearance layout', () => {
     expect(layout.sepalRadius + layout.sepalOpenDrift).toBeGreaterThan(layout.petalOpenEnvelope);
     expect(layout.baseRadius).toBeGreaterThanOrEqual(layout.petalBaseRadius);
     expect(layout.baseRadius).toBeGreaterThan(0.07 * 2);
-    expect(layout.sepalBaseLift).toBeLessThanOrEqual(-0.042);
+    expect(layout.sepalBaseLift).toBeLessThanOrEqual(-0.052);
+    expect(layout.sepalClosedAngleDeg).toBeGreaterThanOrEqual(8);
+    expect(layout.sepalBudTipDrop).toBeGreaterThan(0.05);
+    expect(layout.sepalBaseLift - layout.sepalBudTipDrop).toBeLessThan(layout.sepalBaseLift);
     expect(layout.sepalOpenDrift).toBeGreaterThan(0);
     expect(layout.sepalDrop).toBeGreaterThan(0);
   });
@@ -59,6 +62,8 @@ describe('petal clearance layout', () => {
     expect(layout.baseRadius).toBeGreaterThanOrEqual(layout.petalBaseRadius);
     expect(layout.sepalRadius).toBeGreaterThan(layout.petalClosedEnvelope);
     expect(layout.sepalRadius + layout.sepalOpenDrift - layout.petalOpenEnvelope).toBeGreaterThan(0.01);
+    expect(layout.sepalClosedAngleDeg).toBeGreaterThan(0);
+    expect(layout.sepalBaseLift - layout.sepalBudTipDrop).toBeLessThan(-0.1);
   });
 
   it('keeps sunflower involucral bracts close to the capitulum rim', () => {
@@ -79,5 +84,6 @@ describe('petal clearance layout', () => {
     expect(layout.baseRadius).toBeCloseTo(0.83 * 0.94);
     expect(layout.sepalRadius + layout.sepalOpenDrift).toBeGreaterThan(layout.petalOpenEnvelope);
     expect(layout.sepalDrop).toBeGreaterThan(layout.sepalOpenDrift);
+    expect(layout.sepalClosedAngleDeg).toBeGreaterThanOrEqual(8);
   });
 });

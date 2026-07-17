@@ -13,6 +13,7 @@ import {
   type InflorescencePetalSpec,
 } from './inflorescence-layout';
 import { displayStemRadius } from './stem-proportions';
+import { resolveBotanicalCurvature } from './botanical-curvature';
 
 interface PetalUnfurlMotion {
   layer: number;
@@ -67,6 +68,7 @@ interface InflorescencePetalMotion {
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const DEG = Math.PI / 180;
+const WISTERIA_HANGER_LENGTH = 0.62;
 
 const makeStandardMaterial = (parameters: ConstructorParameters<typeof THREE.MeshStandardNodeMaterial>[0]) =>
   new THREE.MeshStandardNodeMaterial(parameters);
@@ -89,6 +91,8 @@ export class FlowerModel implements Bloomable {
   private readonly inflorescencePetals: InflorescencePetalMotion[] = [];
   private discMesh?: THREE.InstancedMesh;
   private readonly dummy = new THREE.Object3D();
+  private readonly stemCurve: THREE.CubicBezierCurve3;
+  private readonly stemTip = new THREE.Vector3();
   private lastProgress = -1;
   private readonly headBaseTilt: number;
   private readonly headBaseYaw: number;
@@ -97,6 +101,23 @@ export class FlowerModel implements Bloomable {
     this.preset = preset;
     this.growth = resolveGrowthProfile(preset);
     const architecture = resolveBotanicalArchitecture(preset);
+    const curvature = resolveBotanicalCurvature(architecture.stemHabit, architecture.leafShape);
+    const curveSeed = [...preset.id].reduce((sum, character, index) => sum + character.charCodeAt(0) * (index + 3), 0);
+    const curveAzimuth = curveSeed * 0.173;
+    const curveBend = preset.morphology.stemHeight * curvature.stemBendRatio;
+    const curveX = Math.sin(curveAzimuth);
+    const curveZ = Math.cos(curveAzimuth);
+    this.stemTip.set(
+      curveX * curveBend * 0.72,
+      preset.morphology.stemHeight,
+      curveZ * curveBend * 0.72,
+    );
+    this.stemCurve = new THREE.CubicBezierCurve3(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(curveX * curveBend * 0.08, preset.morphology.stemHeight * 0.31, curveZ * curveBend * 0.08),
+      new THREE.Vector3(curveX * curveBend, preset.morphology.stemHeight * 0.72, curveZ * curveBend),
+      this.stemTip.clone(),
+    );
     this.headBaseTilt = architecture.headTiltDeg * DEG;
     this.headBaseYaw = (architecture.headAzimuthDeg ?? 0) * DEG;
     this.attachmentLayout = computeFloralAttachment({
@@ -114,9 +135,9 @@ export class FlowerModel implements Bloomable {
     this.root.name = `flower-${preset.id}`;
     this.buildStem();
     this.head.position.set(
-      preset.kind === 'wisteria' ? 0.62 : 0,
-      preset.morphology.stemHeight,
-      0,
+      this.stemTip.x + (preset.kind === 'wisteria' ? WISTERIA_HANGER_LENGTH : 0),
+      this.stemTip.y,
+      this.stemTip.z,
     );
     this.head.rotation.set(this.headBaseTilt, this.headBaseYaw, 0, 'YXZ');
     this.head.scale.setScalar(preset.morphology.flowerScale);
@@ -138,9 +159,8 @@ export class FlowerModel implements Bloomable {
     const architecture = resolveBotanicalArchitecture(this.preset);
     const stemRadius = displayStemRadius(m.stemRadius);
     const stemMaterial = this.track(makeStandardMaterial({ color: this.preset.colors.stem, roughness: 0.86 }));
-    const stemGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.74, stemRadius, m.stemHeight, 14, 5));
+    const stemGeometry = this.track(new THREE.TubeGeometry(this.stemCurve, 24, stemRadius * 0.86, 10, false));
     const stem = new THREE.Mesh(stemGeometry, stemMaterial);
-    stem.position.y = m.stemHeight * 0.5;
     stem.castShadow = true;
     stem.receiveShadow = true;
     this.root.add(stem);
@@ -172,11 +192,14 @@ export class FlowerModel implements Bloomable {
         ? nodeIndex * GOLDEN_ANGLE + (index % 2) * Math.PI + 0.7
         : index * GOLDEN_ANGLE + 0.7;
       const radial = new THREE.Group();
-      radial.position.y = y;
+      if (separate) {
+        radial.position.set(Math.sin(angle) * m.stemHeight * 0.18, y, Math.cos(angle) * m.stemHeight * 0.18);
+      } else {
+        this.stemCurve.getPointAt(THREE.MathUtils.clamp(y / m.stemHeight, 0, 1), radial.position);
+      }
       radial.rotation.y = angle;
       radial.rotation.x = separate ? 0.03 : basal ? -1.02 : clustered ? -0.62 : architecture.leafArrangement === 'whorled' ? -0.48 : -0.58;
       radial.rotation.z = Math.sin(index * 2.1) * 0.12;
-      if (separate) radial.position.set(Math.sin(angle) * m.stemHeight * 0.18, y, Math.cos(angle) * m.stemHeight * 0.18);
       const mesh = new THREE.Mesh(leafGeometry, leafMaterial);
       mesh.scale.set(leafWidth, 1, leafLength);
       mesh.castShadow = true;
@@ -191,7 +214,8 @@ export class FlowerModel implements Bloomable {
         const branchGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.34, stemRadius * 0.52, branchLength, 8, 2));
         branchGeometry.translate(0, branchLength * 0.5, 0);
         const branch = new THREE.Mesh(branchGeometry, stemMaterial);
-        branch.position.y = m.stemHeight * (0.28 + (index + 1) / (architecture.branchCount + 1) * 0.48);
+        const branchRatio = 0.28 + (index + 1) / (architecture.branchCount + 1) * 0.48;
+        this.stemCurve.getPointAt(branchRatio, branch.position);
         branch.rotation.y = index * GOLDEN_ANGLE;
         branch.rotation.z = architecture.branchAngleDeg * DEG;
         branch.castShadow = true;
@@ -199,10 +223,10 @@ export class FlowerModel implements Bloomable {
       }
     }
     if (this.preset.kind === 'wisteria') {
-      const hangerLength = 0.62;
+      const hangerLength = WISTERIA_HANGER_LENGTH;
       const hangerGeometry = this.track(new THREE.CylinderGeometry(stemRadius * 0.48, stemRadius * 0.62, hangerLength, 10, 2));
       const hanger = new THREE.Mesh(hangerGeometry, stemMaterial);
-      hanger.position.set(hangerLength * 0.5, m.stemHeight, 0);
+      hanger.position.set(this.stemTip.x + hangerLength * 0.5, this.stemTip.y, this.stemTip.z);
       hanger.rotation.z = -Math.PI * 0.5;
       hanger.castShadow = true;
       this.root.add(hanger);
@@ -555,8 +579,8 @@ export class FlowerModel implements Bloomable {
       colors: sepalColors,
     }));
     const isSunflower = this.preset.kind === 'sunflower';
-    // Reflex the calyx far enough below the corolla that a front-facing sepal
-    // cannot project back through the open petal cup at oblique camera angles.
+    // Start below the bud with a positive, downward hinge angle. The previous
+    // negative angle raised the sepal tip into the closed corolla.
     const openAngle = isSunflower ? 138 : this.preset.id === 'lotus' ? 118 : 128;
     const delay = Math.max(0.015, this.growth.openingStart - (isSunflower ? 0.08 : 0.1));
     const span = Math.min(0.62, Math.max(0.3, this.growth.openingSpan * (isSunflower ? 0.9 : 0.72)));
@@ -577,7 +601,7 @@ export class FlowerModel implements Bloomable {
         mesh,
         delay,
         openAngle,
-        closedAngle: isSunflower ? -8 : -12,
+        closedAngle: placement.sepalClosedAngleDeg,
         closedRoll,
         roll: (index % 2 === 0 ? -1 : 1) * (isSunflower ? 5 : 3) * DEG,
         sweep: Math.sin(index * 1.93) * (isSunflower ? 4 : 2.5) * DEG,
@@ -761,7 +785,11 @@ export class FlowerModel implements Bloomable {
     }
     this.head.rotation.x = this.headBaseTilt + Math.cos(subtleTime * 0.12) * 0.006;
     this.head.rotation.y = this.headBaseYaw + Math.sin(subtleTime * 0.14) * 0.012;
-    this.head.position.y = m.stemHeight + Math.sin(subtleTime * 0.36) * 0.006;
+    this.head.position.set(
+      this.stemTip.x + (this.preset.kind === 'wisteria' ? WISTERIA_HANGER_LENGTH : 0),
+      this.stemTip.y + Math.sin(subtleTime * 0.36) * 0.006,
+      this.stemTip.z,
+    );
     this.lastProgress = progress;
   }
 

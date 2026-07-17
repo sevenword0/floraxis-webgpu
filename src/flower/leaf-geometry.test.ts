@@ -27,4 +27,24 @@ describe('botanical leaf geometry', () => {
     peltate.dispose();
     lance.dispose();
   });
+
+  it('builds visible longitudinal and transverse curvature into simple leaves', () => {
+    const geometry = createLeafGeometry('ovate-serrate');
+    const position = geometry.getAttribute('position');
+    const middleRows = Array.from({ length: position.count }, (_, index) => index)
+      .filter((index) => Math.abs(position.getZ(index) - 0.5) < 0.04);
+    const inner = middleRows.reduce((best, index) => (
+      Math.abs(position.getX(index)) < Math.abs(position.getX(best)) ? index : best
+    ), middleRows[0]);
+    const edge = middleRows.reduce((best, index) => (
+      Math.abs(position.getX(index)) > Math.abs(position.getX(best)) ? index : best
+    ), middleRows[0]);
+    const tip = Array.from({ length: position.count }, (_, index) => index)
+      .reduce((best, index) => position.getZ(index) > position.getZ(best) ? index : best, 0);
+
+    expect(position.getY(edge)).toBeGreaterThan(position.getY(inner));
+    expect(position.getY(tip)).toBeLessThan(position.getY(inner));
+    expect(geometry.boundingBox!.max.y - geometry.boundingBox!.min.y).toBeGreaterThan(0.08);
+    geometry.dispose();
+  });
 });

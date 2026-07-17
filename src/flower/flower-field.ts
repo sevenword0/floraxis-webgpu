@@ -14,6 +14,12 @@ import { generateFieldSupportSegments } from './field-support-layout';
 import { displayStemRadius } from './stem-proportions';
 import { expandFieldFloweringShoots } from './flowering-shoot-layout';
 import {
+  FIELD_STEM_CURVE_SEGMENTS,
+  resolveBotanicalCurvature,
+  sampleStemCurvePoint,
+  type BotanicalCurvatureProfile,
+} from './botanical-curvature';
+import {
   botanicalLengthToWorld,
   evaluateFieldBloom,
   generateFieldLayout,
@@ -80,6 +86,7 @@ interface FieldLeafInstance {
 interface SpeciesBatch {
   preset: FlowerPreset;
   growth: BloomGrowthProfile;
+  curvature: BotanicalCurvatureProfile;
   plants: FieldPlant[];
   petals: FieldPetalInstance[];
   sepals: FieldSepalInstance[];
@@ -195,6 +202,10 @@ export class FlowerField implements Bloomable {
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly stemStart = new THREE.Vector3();
   private readonly stemEnd = new THREE.Vector3();
+  private readonly stemRootPose = new THREE.Vector3();
+  private readonly stemTipPose = new THREE.Vector3();
+  private readonly curveSegmentStart = new THREE.Vector3();
+  private readonly curveSegmentEnd = new THREE.Vector3();
   private readonly headPosition = new THREE.Vector3();
   private readonly headQuaternion = new THREE.Quaternion();
   private readonly tiltQuaternion = new THREE.Quaternion();
@@ -202,6 +213,8 @@ export class FlowerField implements Bloomable {
   private readonly right = new THREE.Vector3(1, 0, 0);
   private readonly forward = new THREE.Vector3(0, 0, 1);
   private readonly outward = new THREE.Vector3();
+  private currentStemCurveBend = 0;
+  private currentStemCurveAzimuth = 0;
 
   constructor(settings: FieldSettings, presets: FlowerPreset[]) {
     this.settings = {
@@ -369,7 +382,7 @@ export class FlowerField implements Bloomable {
       delay,
       span,
       openAngle,
-      closedAngle: preset.kind === 'sunflower' ? -8 : -12,
+      closedAngle: placement.sepalClosedAngleDeg,
       closedRoll: (index % 2 === 0 ? -1 : 1) * 1.5 * DEG,
       roll: (index % 2 === 0 ? -1 : 1) * (preset.kind === 'sunflower' ? 5 : 3) * DEG,
       sweep: Math.sin(index * 1.93) * (preset.kind === 'sunflower' ? 4 : 2.5) * DEG,
@@ -403,10 +416,14 @@ export class FlowerField implements Bloomable {
       const count = visibleLeafCount(plant);
       return Array.from({ length: count }, (_, slot) => ({ plant, slot, count }));
     });
-    const stemGeometry = this.track(new THREE.CylinderGeometry(0.72, 1, 1, 8, 2));
+    const stemGeometry = this.track(new THREE.CylinderGeometry(1, 1, 1, 8, 2));
     stemGeometry.translate(0, 0.5, 0);
     const stemMaterial = this.track(new THREE.MeshStandardNodeMaterial({ color: preset.colors.stem, roughness: 0.9 }));
-    const stemMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(stemGeometry, stemMaterial, plants.length));
+    const stemMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(
+      stemGeometry,
+      stemMaterial,
+      plants.length * FIELD_STEM_CURVE_SEGMENTS,
+    ));
     const pedicelMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(stemGeometry, stemMaterial, plants.length));
     let branchMesh: THREE.InstancedMesh | undefined;
     if (branchInstances.length > 0) {
@@ -502,6 +519,7 @@ export class FlowerField implements Bloomable {
     return {
       preset,
       growth,
+      curvature: resolveBotanicalCurvature(architecture.stemHabit, architecture.leafShape),
       plants,
       petals: petalInstances,
       sepals: sepalInstances,
@@ -541,18 +559,26 @@ export class FlowerField implements Bloomable {
     const dynamicTilt = Math.max(0, tilt + pedicelFlex);
     const dynamicYaw = yaw + Math.sin(time * 0.00145 + plant.windPhase * 1.37) * wind * turbulence * 0.045;
 
-    this.stemStart.set(plant.x, plant.groundY, plant.z);
-    this.stemEnd.set(
+    this.stemRootPose.set(plant.x, plant.groundY, plant.z);
+    this.stemTipPose.set(
       plant.x + Math.sin(supportYaw) * supportReach + swayX * 0.72,
       plant.groundY + Math.cos(supportTilt) * stemHeight,
       plant.z + Math.cos(supportYaw) * supportReach + swayZ * 0.72,
     );
+    const curveVariation = 0.78 + (Math.sin(plant.index * 2.17 + plant.windPhase) * 0.5 + 0.5) * 0.22;
+    const gustFlex = THREE.MathUtils.clamp(1 + windBend.gust * wind * 0.28, 0.72, 1.38);
+    this.currentStemCurveBend = stemHeight * batch.curvature.stemBendRatio * curveVariation * gustFlex;
+    this.currentStemCurveAzimuth = plant.yaw
+      + Math.sin(plant.index * 1.91 + plant.windPhase * 0.37) * 0.72
+      + windBend.x * wind * 0.34;
+    this.stemStart.copy(this.stemRootPose);
+    this.stemEnd.copy(this.stemTipPose);
     this.direction.set(
       Math.sin(dynamicYaw) * (pendantRaceme ? 1 : Math.sin(dynamicTilt)),
       pendantRaceme ? 0 : Math.cos(dynamicTilt),
       Math.cos(dynamicYaw) * (pendantRaceme ? 1 : Math.sin(dynamicTilt)),
     );
-    this.headPosition.copy(this.stemEnd).addScaledVector(this.direction, plant.pedicelWorld);
+    this.headPosition.copy(this.stemTipPose).addScaledVector(this.direction, plant.pedicelWorld);
     this.yawQuaternion.setFromAxisAngle(this.up, dynamicYaw);
     this.tiltQuaternion.setFromAxisAngle(this.right, pendantRaceme ? 0 : dynamicTilt);
     this.headQuaternion.copy(this.yawQuaternion).multiply(this.tiltQuaternion);
@@ -586,6 +612,34 @@ export class FlowerField implements Bloomable {
     mesh.setMatrixAt(index, this.transform.matrix);
   }
 
+  private sampleCurrentStemCurve(progress: number, out: THREE.Vector3): THREE.Vector3 {
+    return sampleStemCurvePoint(
+      this.stemRootPose,
+      this.stemTipPose,
+      progress,
+      this.currentStemCurveBend,
+      this.currentStemCurveAzimuth,
+      out,
+    );
+  }
+
+  private setCurvedStem(batch: SpeciesBatch, plantIndex: number, radius: number): void {
+    for (let segment = 0; segment < FIELD_STEM_CURVE_SEGMENTS; segment += 1) {
+      const startT = segment / FIELD_STEM_CURVE_SEGMENTS;
+      const endT = (segment + 1) / FIELD_STEM_CURVE_SEGMENTS;
+      this.sampleCurrentStemCurve(startT, this.curveSegmentStart);
+      this.sampleCurrentStemCurve(endT, this.curveSegmentEnd);
+      const taperedRadius = radius * THREE.MathUtils.lerp(1, 0.74, (startT + endT) * 0.5);
+      this.setCylinderBetween(
+        batch.stemMesh,
+        plantIndex * FIELD_STEM_CURVE_SEGMENTS + segment,
+        this.curveSegmentStart,
+        this.curveSegmentEnd,
+        taperedRadius,
+      );
+    }
+  }
+
   private setHeadMatrix(batch: SpeciesBatch, plant: FieldPlant, time: number, localBloom: number): void {
     const m = batch.preset.morphology;
     this.resolveHeadPose(batch, plant, time, localBloom);
@@ -604,8 +658,8 @@ export class FlowerField implements Bloomable {
       const localBloom = evaluateFieldBloom(this.currentProgress, plant.bloomDelay);
       this.resolveHeadPose(batch, plant, time, localBloom);
       const radius = this.stemRadius(batch, plant);
-      this.setCylinderBetween(batch.stemMesh, index, this.stemStart, this.stemEnd, radius);
-      this.setCylinderBetween(batch.pedicelMesh, index, this.stemEnd, this.headPosition, radius * 0.66);
+      this.setCurvedStem(batch, index, radius);
+      this.setCylinderBetween(batch.pedicelMesh, index, this.stemTipPose, this.headPosition, radius * 0.66);
 
       this.setHeadMatrix(batch, plant, time, localBloom);
       const reveal = evaluateReproductiveReveal(batch.growth, localBloom);
@@ -637,7 +691,7 @@ export class FlowerField implements Bloomable {
         : architecture.stemHabit === 'shrub' ? 0.22 : 0.14;
       batch.branches.forEach(({ plant, slot }, index) => {
         const localBloom = evaluateFieldBloom(this.currentProgress, plant.bloomDelay);
-        const stemHeight = this.resolveHeadPose(batch, plant, time, localBloom);
+        this.resolveHeadPose(batch, plant, time, localBloom);
         const ratio = 0.26 + (slot + 1) / (plant.branchCount + 1) * 0.56;
         const branchWind = sampleWindBend(
           time,
@@ -650,11 +704,7 @@ export class FlowerField implements Bloomable {
         const angle = plant.yaw + slot * GOLDEN_ANGLE + branchWind.x * 0.035;
         const branchAngle = plant.branchAngleDeg * DEG + branchWind.gust * 0.055;
         const length = plant.visualHeight * habitLength * (0.82 + (slot % 3) * 0.09);
-        this.stemStart.set(
-          THREE.MathUtils.lerp(plant.x, this.stemEnd.x, ratio),
-          plant.groundY + stemHeight * ratio,
-          THREE.MathUtils.lerp(plant.z, this.stemEnd.z, ratio),
-        );
+        this.sampleCurrentStemCurve(ratio, this.stemStart);
         this.stemEnd.set(
           this.stemStart.x + Math.sin(angle) * Math.sin(branchAngle) * length,
           this.stemStart.y + Math.cos(branchAngle) * length,
@@ -674,9 +724,7 @@ export class FlowerField implements Bloomable {
     const architecture = resolveBotanicalArchitecture(batch.preset);
     batch.leaves.forEach(({ plant, slot, count }, index) => {
       const localBloom = evaluateFieldBloom(this.currentProgress, plant.bloomDelay);
-      const stemHeight = this.resolveHeadPose(batch, plant, time, localBloom);
-      const stemTopX = this.stemEnd.x;
-      const stemTopZ = this.stemEnd.z;
+      this.resolveHeadPose(batch, plant, time, localBloom);
       const opposite = architecture.leafArrangement === 'opposite';
       const leafNode = opposite ? Math.floor(slot / 2) : slot;
       const leafNodeCount = opposite ? Math.ceil(count / 2) : count;
@@ -722,11 +770,13 @@ export class FlowerField implements Bloomable {
         angle = plant.yaw + branchSlot * GOLDEN_ANGLE + branchWind.x * 0.035;
         const branchAngle = plant.branchAngleDeg * DEG + branchWind.gust * 0.055;
         const branchLength = plant.visualHeight * 0.34 * (0.82 + (branchSlot % 3) * 0.09);
-        const branchBaseX = THREE.MathUtils.lerp(plant.x, stemTopX, branchRatio);
-        const branchBaseZ = THREE.MathUtils.lerp(plant.z, stemTopZ, branchRatio);
+        this.sampleCurrentStemCurve(branchRatio, this.stemStart);
+        const branchBaseX = this.stemStart.x;
+        const branchBaseY = this.stemStart.y;
+        const branchBaseZ = this.stemStart.z;
         this.stemStart.set(
           branchBaseX + Math.sin(angle) * Math.sin(branchAngle) * branchLength,
-          plant.groundY + stemHeight * branchRatio + Math.cos(branchAngle) * branchLength,
+          branchBaseY + Math.cos(branchAngle) * branchLength,
           branchBaseZ + Math.cos(angle) * Math.sin(branchAngle) * branchLength,
         );
         const petiole = Math.max(0.025, Math.min(0.18, widthWorld * 0.58));
@@ -736,11 +786,7 @@ export class FlowerField implements Bloomable {
           this.stemStart.z + Math.cos(angle) * petiole,
         );
       } else {
-        this.stemStart.set(
-          THREE.MathUtils.lerp(plant.x, stemTopX, ratio),
-          plant.groundY + stemHeight * ratio,
-          THREE.MathUtils.lerp(plant.z, stemTopZ, ratio),
-        );
+        this.sampleCurrentStemCurve(ratio, this.stemStart);
         const petiole = Math.max(0.025, Math.min(0.16, widthWorld * 0.52));
         this.stemEnd.set(
           this.stemStart.x + Math.sin(angle) * petiole,

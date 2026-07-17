@@ -38,6 +38,10 @@ export interface FloralAttachmentLayout {
   petalOpenEnvelope: number;
   sepalRadius: number;
   sepalBaseLift: number;
+  /** Downward/outward hinge angle that keeps the closed calyx below the bud. */
+  sepalClosedAngleDeg: number;
+  /** Vertical separation between the sepal hinge and its closed-stage tip. */
+  sepalBudTipDrop: number;
   sepalOpenDrift: number;
   sepalDrop: number;
 }
@@ -116,6 +120,17 @@ export const computeFloralAttachment = (options: FloralAttachmentOptions): Flora
     headRadius * 0.8,
     headRadius * 1.95,
   );
+  const sepalBaseLift = -Math.max(
+    options.sunflower ? 0.065 : 0.052,
+    baseDepth * (options.sunflower ? 0.5 : 0.7) + options.petalThickness * 0.85,
+  );
+  const requiredBudTipDrop = Math.max(0.028, options.petalThickness * 2.4, baseDepth * 0.12);
+  const sepalClosedAngleDeg = clamp(
+    Math.asin(clamp(requiredBudTipDrop / Math.max(0.08, options.sepalLength), 0, 0.3)) * 180 / Math.PI,
+    8,
+    14,
+  );
+  const sepalBudTipDrop = Math.sin(sepalClosedAngleDeg * Math.PI / 180) * options.sepalLength;
 
   return {
     baseRadius,
@@ -125,7 +140,9 @@ export const computeFloralAttachment = (options: FloralAttachmentOptions): Flora
     petalClosedEnvelope,
     petalOpenEnvelope,
     sepalRadius,
-    sepalBaseLift: -Math.max(options.sunflower ? 0.055 : 0.042, baseDepth * (options.sunflower ? 0.46 : 0.64)),
+    sepalBaseLift,
+    sepalClosedAngleDeg,
+    sepalBudTipDrop,
     sepalOpenDrift,
     sepalDrop: options.sepalLength * (options.sunflower ? 0.16 : 0.12),
   };
