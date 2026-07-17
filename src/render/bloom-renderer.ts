@@ -4,15 +4,21 @@ import {
   diffuseColor,
   float,
   int,
+  max,
   metalness,
+  mix,
   mrt,
+  nodeObject,
   normalView,
   output,
   packNormalToRGB,
   pass,
+  pow,
   roughness,
   sample,
+  smoothstep,
   unpackRGBToNormal,
+  uniform,
   vec2,
   vec3,
   vec4,
@@ -20,6 +26,7 @@ import {
 import WebGPU from 'three/addons/capabilities/WebGPU.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { smaa } from 'three/addons/tsl/display/SMAANode.js';
@@ -30,6 +37,7 @@ import { boxBlur } from 'three/addons/tsl/display/boxBlur.js';
 import type { Bloomable, FieldSettings, FlowerPreset, RenderSettings, SceneMode } from '../types';
 import { FlowerModel } from '../flower/flower-model';
 import { FlowerField } from '../flower/flower-field';
+import { shapedDepthOfField, type ShapedDepthOfFieldNode } from './shaped-depth-of-field-node';
 
 export interface RendererFrameInfo {
   fps: number;
@@ -45,6 +53,18 @@ export interface RendererCapabilities {
 
 type FrameCallback = (deltaSeconds: number, elapsedMs: number, info: RendererFrameInfo) => void;
 
+interface EnvironmentTarget {
+  texture: THREE.Texture;
+  dispose(): void;
+}
+
+interface EnvironmentImageInfo {
+  name: string;
+  width: number;
+  height: number;
+  hdr: boolean;
+}
+
 const ENVIRONMENTS = {
   studio: {
     background: 0x101816,
@@ -54,6 +74,11 @@ const ENVIRONMENTS = {
     rim: 0xff8fbd,
     exposure: 0.94,
     intensity: 0.76,
+    skyTop: '#132621',
+    skyHorizon: '#879f8f',
+    ground: '#17201c',
+    glow: '#f7e8ca',
+    glowX: 0.7,
   },
   dawn: {
     background: 0x1d1720,
@@ -63,6 +88,11 @@ const ENVIRONMENTS = {
     rim: 0xff7c9e,
     exposure: 1,
     intensity: 0.88,
+    skyTop: '#241525',
+    skyHorizon: '#e8977c',
+    ground: '#25191d',
+    glow: '#ffd0a0',
+    glowX: 0.73,
   },
   moon: {
     background: 0x090d18,
@@ -72,8 +102,60 @@ const ENVIRONMENTS = {
     rim: 0x7de3d0,
     exposure: 0.86,
     intensity: 0.7,
+    skyTop: '#050915',
+    skyHorizon: '#344465',
+    ground: '#07100f',
+    glow: '#b9ccff',
+    glowX: 0.28,
   },
 } as const;
+
+const createPresetPanorama = (name: RenderSettings['environment']): THREE.CanvasTexture => {
+  const config = ENVIRONMENTS[name];
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('CANVAS_2D_UNAVAILABLE');
+
+  const sky = context.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, config.skyTop);
+  sky.addColorStop(0.55, config.skyHorizon);
+  sky.addColorStop(0.64, config.ground);
+  sky.addColorStop(1, '#050908');
+  context.fillStyle = sky;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const glowX = canvas.width * config.glowX;
+  const glowY = canvas.height * 0.42;
+  const glow = context.createRadialGradient(glowX, glowY, 0, glowX, glowY, canvas.height * 0.35);
+  glow.addColorStop(0, config.glow);
+  glow.addColorStop(0.08, `${config.glow}cc`);
+  glow.addColorStop(0.34, `${config.glow}28`);
+  glow.addColorStop(1, `${config.glow}00`);
+  context.fillStyle = glow;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (name === 'moon') {
+    context.fillStyle = '#dce7ff';
+    for (let index = 0; index < 180; index += 1) {
+      const x = (Math.sin(index * 91.71) * 0.5 + 0.5) * canvas.width;
+      const y = (Math.sin(index * 47.13 + 1.7) * 0.5 + 0.5) * canvas.height * 0.55;
+      const radius = 0.35 + (index % 5) * 0.16;
+      context.globalAlpha = 0.2 + (index % 7) * 0.08;
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalAlpha = 1;
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.name = `Floraxis ${name} panorama`;
+  return texture;
+};
 
 export class BloomRenderer {
   readonly scene = new THREE.Scene();
@@ -87,6 +169,11 @@ export class BloomRenderer {
   private readonly keyLight = new THREE.DirectionalLight(0xfff0d4, 5.2);
   private readonly fillLight = new THREE.PointLight(0x84b8ff, 18, 12, 2);
   private readonly rimLight = new THREE.PointLight(0xff8fbd, 16, 10, 2);
+  private readonly focusDistanceUniform = uniform(6.8);
+  private readonly focusRangeUniform = uniform(1.8);
+  private readonly bokehScaleUniform = uniform(2.2);
+  private readonly bokehGammaUniform = uniform(1.08);
+  private readonly defocusGammaUniform = uniform(1);
   private controls!: OrbitControls;
   private pipeline!: THREE.RenderPipeline;
   private subject?: Bloomable;
@@ -110,6 +197,12 @@ export class BloomRenderer {
   private ssrPass: any;
   private contactPass: any;
   private bloomPass: any;
+  private scenePassViewZ: any;
+  private dofPass?: ShapedDepthOfFieldNode;
+  private roomEnvironmentTarget?: EnvironmentTarget;
+  private readonly presetPanoramas = new Map<RenderSettings['environment'], THREE.Texture>();
+  private customEnvironment?: { background: THREE.Texture; lighting: EnvironmentTarget; info: EnvironmentImageInfo };
+  private environmentSource: 'preset' | 'custom' = 'preset';
 
   constructor(host: HTMLElement, onFrame: FrameCallback) {
     this.host = host;
@@ -209,11 +302,68 @@ export class BloomRenderer {
   private async setupEnvironment(): Promise<void> {
     const room = new RoomEnvironment();
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    const target = pmrem.fromScene(room, 0.04, 0.1, 100);
-    this.scene.environment = target.texture;
+    this.roomEnvironmentTarget = pmrem.fromScene(room, 0.04, 0.1, 100);
+    this.scene.environment = this.roomEnvironmentTarget.texture;
     this.scene.environmentIntensity = 0.76;
+    (Object.keys(ENVIRONMENTS) as RenderSettings['environment'][]).forEach((name) => {
+      this.presetPanoramas.set(name, createPresetPanorama(name));
+    });
     room.dispose();
     pmrem.dispose();
+  }
+
+  async loadEnvironmentImage(file: File): Promise<EnvironmentImageInfo> {
+    const hdr = file.name.toLowerCase().endsWith('.hdr');
+    const objectUrl = URL.createObjectURL(file);
+    let texture: THREE.Texture | undefined;
+    try {
+      texture = hdr
+        ? await new HDRLoader().loadAsync(objectUrl)
+        : await new THREE.TextureLoader().loadAsync(objectUrl);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+
+    const image = texture.image as { width?: number; height?: number } | undefined;
+    const width = Number(image?.width ?? 0);
+    const height = Number(image?.height ?? 0);
+    if (width < 64 || height < 32) {
+      texture.dispose();
+      throw new Error('ENVIRONMENT_IMAGE_TOO_SMALL');
+    }
+
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    if (!hdr) texture.colorSpace = THREE.SRGBColorSpace;
+    texture.name = `Custom environment: ${file.name}`;
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const lighting = pmrem.fromEquirectangular(texture);
+    pmrem.dispose();
+
+    this.customEnvironment?.background.dispose();
+    this.customEnvironment?.lighting.dispose();
+    const info = { name: file.name, width, height, hdr };
+    this.customEnvironment = { background: texture, lighting, info };
+    this.environmentSource = 'custom';
+    this.applyEnvironment();
+    return info;
+  }
+
+  usePresetEnvironment(name: RenderSettings['environment']): void {
+    this.settings.environment = name;
+    this.environmentSource = 'preset';
+    this.applyEnvironment();
+  }
+
+  clearCustomEnvironment(): void {
+    this.customEnvironment?.background.dispose();
+    this.customEnvironment?.lighting.dispose();
+    this.customEnvironment = undefined;
+    this.environmentSource = 'preset';
+    this.applyEnvironment();
+  }
+
+  hasCustomEnvironment(): boolean {
+    return Boolean(this.customEnvironment);
   }
 
   private setupPipeline(): void {
@@ -228,6 +378,7 @@ export class BloomRenderer {
     this.scenePassColor = scenePass.getTextureNode('output');
     this.scenePassDiffuse = scenePass.getTextureNode('diffuseColor');
     const scenePassDepth = scenePass.getTextureNode('depth');
+    this.scenePassViewZ = scenePass.getViewZNode();
     const packedNormal = scenePass.getTextureNode('normal');
     const metalRough = scenePass.getTextureNode('metalrough');
     scenePass.getTexture('normal').type = THREE.UnsignedByteType;
@@ -297,6 +448,34 @@ export class BloomRenderer {
     }
     if (this.settings.ssr) composite = vec4(composite.rgb.add(this.ssrPass.rgb), composite.a);
     if (this.settings.bloom) composite = composite.add(this.bloomPass);
+    this.dofPass?.dispose();
+    this.dofPass = undefined;
+    if (this.settings.depthOfField) {
+      const bokehExponent = float(1).div(this.bokehGammaUniform);
+      const bokehInput = vec4(
+        pow(max(composite.rgb, vec3(0.00001)), vec3(bokehExponent)),
+        composite.a,
+      );
+      this.dofPass = shapedDepthOfField(
+        bokehInput,
+        this.scenePassViewZ,
+        this.focusDistanceUniform,
+        this.focusRangeUniform,
+        this.bokehScaleUniform,
+        this.settings.bokehShape,
+        this.settings.bokehBlades,
+        this.settings.bokehRotation,
+      );
+      const defocusExponent = float(1).div(this.defocusGammaUniform);
+      const dofOutput: any = nodeObject(this.dofPass);
+      const defocused = pow(max(dofOutput.rgb, vec3(0.00001)), vec3(defocusExponent));
+      const circleOfConfusion = smoothstep(
+        float(0),
+        this.focusRangeUniform,
+        this.scenePassViewZ.negate().sub(this.focusDistanceUniform).abs(),
+      );
+      composite = vec4(mix(composite.rgb, defocused, circleOfConfusion), composite.a);
+    }
     this.pipeline.outputNode = smaa(composite);
     this.pipeline.needsUpdate = true;
   }
@@ -327,10 +506,18 @@ export class BloomRenderer {
   }
 
   setRenderSettings(settings: RenderSettings): void {
+    const previous = this.settings;
     const previousQuality = this.settings.quality;
     this.settings = { ...settings, ssgi: settings.ssgi && this.capabilities.ssgi };
     this.keyLight.castShadow = this.settings.softShadows;
     this.renderer.shadowMap.enabled = this.settings.softShadows;
+    this.camera.fov = Math.min(85, Math.max(18, this.settings.cameraFov));
+    this.camera.updateProjectionMatrix();
+    this.focusDistanceUniform.value = this.settings.focusDistance;
+    this.focusRangeUniform.value = this.settings.focusRange;
+    this.bokehScaleUniform.value = this.settings.bokehScale;
+    this.bokehGammaUniform.value = this.settings.bokehGamma;
+    this.defocusGammaUniform.value = this.settings.defocusGamma;
     if (previousQuality !== settings.quality) {
       this.renderer.setPixelRatio(this.getPixelRatio());
       const cinematic = settings.quality === 'cinematic';
@@ -344,19 +531,50 @@ export class BloomRenderer {
       }
       this.resize();
     }
-    this.setEnvironment(settings.environment);
-    this.rebuildPipeline();
+    this.applyEnvironment();
+    const pipelineChanged = previous.ssgi !== this.settings.ssgi
+      || previous.ssr !== this.settings.ssr
+      || previous.ao !== this.settings.ao
+      || previous.contactShadows !== this.settings.contactShadows
+      || previous.bloom !== this.settings.bloom
+      || previous.depthOfField !== this.settings.depthOfField
+      || previous.bokehShape !== this.settings.bokehShape
+      || previous.bokehBlades !== this.settings.bokehBlades
+      || previous.bokehRotation !== this.settings.bokehRotation;
+    if (pipelineChanged) this.rebuildPipeline();
   }
 
   setEnvironment(name: RenderSettings['environment']): void {
-    const env = ENVIRONMENTS[name];
-    this.scene.background = new THREE.Color(env.background);
+    this.settings.environment = name;
+    this.applyEnvironment();
+  }
+
+  private applyEnvironment(): void {
+    const env = ENVIRONMENTS[this.settings.environment];
+    const custom = this.environmentSource === 'custom' ? this.customEnvironment : undefined;
+    this.scene.environment = custom?.lighting.texture ?? this.roomEnvironmentTarget?.texture ?? null;
+    this.scene.background = this.settings.environmentBackground
+      ? custom?.background ?? this.presetPanoramas.get(this.settings.environment) ?? new THREE.Color(env.background)
+      : new THREE.Color(env.background);
     if (this.scene.fog instanceof THREE.FogExp2) this.scene.fog.color.setHex(env.fog);
     this.keyLight.color.setHex(env.key);
     this.fillLight.color.setHex(env.fill);
     this.rimLight.color.setHex(env.rim);
+    const lightScale = Math.min(2.5, Math.max(0, this.settings.environmentIntensity));
+    this.keyLight.intensity = 3.3 * lightScale;
+    this.fillLight.intensity = 9 * lightScale;
+    this.rimLight.intensity = 8 * lightScale;
     this.renderer.toneMappingExposure = env.exposure;
-    this.scene.environmentIntensity = env.intensity;
+    this.scene.environmentIntensity = env.intensity * lightScale;
+    this.scene.backgroundIntensity = Math.min(2.5, Math.max(0, this.settings.backgroundIntensity));
+    this.scene.backgroundBlurriness = Math.min(1, Math.max(0, this.settings.backgroundBlur));
+    const rotation = this.settings.environmentRotation * Math.PI / 180;
+    this.scene.environmentRotation.set(0, rotation, 0);
+    this.scene.backgroundRotation.set(0, rotation, 0);
+  }
+
+  getTargetFocusDistance(): number {
+    return this.camera.position.distanceTo(this.controls.target);
   }
 
   focusFlower(): void {

@@ -273,6 +273,27 @@
                   <label>환경광<select id="environment"><option value="studio">Botanical studio</option><option value="dawn">Warm dawn</option><option value="moon">Moon glasshouse</option></select></label>
                   <label>품질<select id="quality"><option value="balanced">Balanced</option><option value="cinematic">Cinematic</option></select></label>
                 </div>
+                <div class="render-subgroup" aria-label="환경조명과 배경 이미지">
+                  <span class="render-subtitle">환경조명 · 파노라마</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>조명 강도 <output data-render-output="environmentIntensity">100%</output></span><input type="range" min="0" max="2" step="0.01" data-render-number="environmentIntensity" /></label>
+                    <label class="range-field"><span>배경 밝기 <output data-render-output="backgroundIntensity">76%</output></span><input type="range" min="0" max="2" step="0.01" data-render-number="backgroundIntensity" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>배경 흐림 <output data-render-output="backgroundBlur">16%</output></span><input type="range" min="0" max="1" step="0.01" data-render-number="backgroundBlur" /></label>
+                    <label class="range-field"><span>환경 회전 <output data-render-output="environmentRotation">0°</output></span><input type="range" min="-180" max="180" step="1" data-render-number="environmentRotation" /></label>
+                  </div>
+                  <div class="environment-actions">
+                    <button type="button" id="environment-upload">파노라마 불러오기</button>
+                    <button type="button" id="environment-clear" disabled>프리셋으로</button>
+                    <input class="is-hidden" id="environment-file" type="file" accept="image/jpeg,image/png,image/webp,.hdr" />
+                  </div>
+                  <small class="environment-file-status" id="environment-file-status" aria-live="polite">내장 절차 파노라마 · 2:1</small>
+                </div>
+                <div class="render-subgroup" aria-label="카메라와 렌즈">
+                  <span class="render-subtitle">카메라 · 렌즈</span>
+                  <label class="range-field"><span>카메라 화각 <output data-render-output="cameraFov">38°</output></span><input type="range" min="18" max="85" step="1" data-render-number="cameraFov" /></label>
+                </div>
                 <div class="toggle-grid">
                   <label class="effect-toggle" title="화면 공간 전역 조명"><input type="checkbox" data-render="ssgi" /><span><b>SSGI</b><small>간접광</small></span><i></i></label>
                   <label class="effect-toggle" title="화면 공간 반사"><input type="checkbox" data-render="ssr" /><span><b>SSR</b><small>반사</small></span><i></i></label>
@@ -280,6 +301,28 @@
                   <label class="effect-toggle" title="화면 공간 접촉 그림자"><input type="checkbox" data-render="contactShadows" /><span><b>SSS</b><small>접촉 그림자</small></span><i></i></label>
                   <label class="effect-toggle" title="고휘도 블룸"><input type="checkbox" data-render="bloom" /><span><b>BLOOM</b><small>광 번짐</small></span><i></i></label>
                   <label class="effect-toggle" title="PCF 소프트 섀도"><input type="checkbox" data-render="softShadows" /><span><b>SOFT</b><small>그림자</small></span><i></i></label>
+                  <label class="effect-toggle" title="카메라 심도와 조리개 보케"><input type="checkbox" data-render="depthOfField" /><span><b>DOF</b><small>아웃포커스</small></span><i></i></label>
+                  <label class="effect-toggle" title="환경 이미지를 장면 배경으로 표시"><input type="checkbox" data-render="environmentBackground" /><span><b>PANO</b><small>배경 이미지</small></span><i></i></label>
+                </div>
+                <div class="render-subgroup lens-controls" aria-label="아웃포커스와 보케">
+                  <span class="render-subtitle">아웃포커스 · 보케</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>초점 거리 <output data-render-output="focusDistance">6.8m</output></span><input type="range" min="0.5" max="50" step="0.1" data-render-number="focusDistance" /></label>
+                    <label class="range-field"><span>초점 범위 <output data-render-output="focusRange">1.8m</output></span><input type="range" min="0.1" max="12" step="0.1" data-render-number="focusRange" /></label>
+                  </div>
+                  <button class="focus-target" id="focus-target" type="button">현재 피사체에 초점</button>
+                  <div class="select-row bokeh-select-row">
+                    <label>보케 모양<select id="bokeh-shape"><option value="circle">원형 조리개</option><option value="polygon">사용자 다각형</option><option value="star">별 조리개</option><option value="heart">하트 조리개</option></select></label>
+                    <label class="range-field"><span>조리개 날 <output data-render-output="bokehBlades">6매</output></span><input id="bokeh-blades" type="range" min="3" max="12" step="1" data-render-number="bokehBlades" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>보케 크기 <output data-render-output="bokehScale">2.2×</output></span><input type="range" min="0.4" max="6" step="0.05" data-render-number="bokehScale" /></label>
+                    <label class="range-field"><span>보케 회전 <output data-render-output="bokehRotation">0°</output></span><input id="bokeh-rotation" type="range" min="-180" max="180" step="1" data-render-number="bokehRotation" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>보케 감마 <output data-render-output="bokehGamma">1.08×</output></span><input type="range" min="0.55" max="2.2" step="0.01" data-render-number="bokehGamma" /></label>
+                    <label class="range-field"><span>비초점 감마 <output data-render-output="defocusGamma">1×</output></span><input type="range" min="0.55" max="2.2" step="0.01" data-render-number="defocusGamma" /></label>
+                  </div>
                 </div>
                 <div class="sss-meter">
                   <span>꽃잎 투과 산란 · SSS</span><output id="sss-value">82%</output>

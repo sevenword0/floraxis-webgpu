@@ -50,8 +50,23 @@ const DEFAULT_RENDER: RenderSettings = {
   contactShadows: true,
   bloom: true,
   softShadows: true,
+  depthOfField: false,
+  environmentBackground: true,
   environment: 'studio',
   quality: 'balanced',
+  cameraFov: 38,
+  environmentIntensity: 1,
+  backgroundIntensity: 0.76,
+  backgroundBlur: 0.16,
+  environmentRotation: 0,
+  focusDistance: 6.8,
+  focusRange: 1.8,
+  bokehScale: 2.2,
+  bokehShape: 'polygon',
+  bokehBlades: 6,
+  bokehRotation: 0,
+  bokehGamma: 1.08,
+  defocusGamma: 1,
 };
 
 const DEFAULT_FIELD: FieldSettings = {
@@ -102,6 +117,7 @@ let fieldRebuildTimer = 0;
 let refocusFieldAfterRebuild = false;
 let lastStatsUpdate = 0;
 let selectedFlowerIndex = 0;
+let environmentImageLabel = '내장 절차 파노라마 · 2:1';
 
 type FieldNumericKey =
   | 'count'
@@ -115,6 +131,20 @@ type FieldNumericKey =
   | 'shrubDensity'
   | 'rockDensity'
   | 'terrainRelief';
+
+type RenderNumericKey =
+  | 'cameraFov'
+  | 'environmentIntensity'
+  | 'backgroundIntensity'
+  | 'backgroundBlur'
+  | 'environmentRotation'
+  | 'focusDistance'
+  | 'focusRange'
+  | 'bokehScale'
+  | 'bokehBlades'
+  | 'bokehRotation'
+  | 'bokehGamma'
+  | 'defocusGamma';
 
 try {
   const stored = localStorage.getItem('floraxis:custom-preset');
@@ -474,8 +504,25 @@ const updateRenderUI = (): void => {
     const key = input.dataset.render as keyof RenderSettings;
     input.checked = Boolean(state.render[key]);
   });
+  qsa<HTMLInputElement>('[data-render-number]').forEach((input) => {
+    const key = input.dataset.renderNumber as RenderNumericKey;
+    const value = state.render[key];
+    input.value = String(value);
+    updateRangeVisual(input);
+    const output = qs<HTMLOutputElement>(`[data-render-output="${key}"]`);
+    if (key === 'cameraFov' || key === 'environmentRotation' || key === 'bokehRotation') output.value = `${Math.round(value)}°`;
+    else if (key === 'environmentIntensity' || key === 'backgroundIntensity' || key === 'backgroundBlur') output.value = `${Math.round(value * 100)}%`;
+    else if (key === 'focusDistance' || key === 'focusRange') output.value = `${Number(value.toFixed(1))}m`;
+    else if (key === 'bokehBlades') output.value = `${Math.round(value)}매`;
+    else output.value = `${Number(value.toFixed(2))}×`;
+  });
   qs<HTMLSelectElement>('#environment').value = state.render.environment;
   qs<HTMLSelectElement>('#quality').value = state.render.quality;
+  qs<HTMLSelectElement>('#bokeh-shape').value = state.render.bokehShape;
+  qs<HTMLInputElement>('#bokeh-blades').disabled = state.render.bokehShape === 'circle' || state.render.bokehShape === 'heart';
+  qs<HTMLInputElement>('#bokeh-rotation').disabled = state.render.bokehShape === 'circle';
+  qs<HTMLElement>('#environment-file-status').textContent = environmentImageLabel;
+  qs<HTMLButtonElement>('#environment-clear').disabled = !renderer?.hasCustomEnvironment();
 };
 
 const showToast = (message: string): void => {
@@ -790,14 +837,74 @@ const wireEvents = (): void => {
     });
   });
 
+  qsa<HTMLInputElement>('[data-render-number]').forEach((input) => {
+    const applyValue = (commitStructural: boolean): void => {
+      const key = input.dataset.renderNumber as RenderNumericKey;
+      const value = key === 'bokehBlades' ? Math.round(Number(input.value)) : Number(input.value);
+      (state.render as unknown as Record<string, number>)[key] = value;
+      updateRenderUI();
+      const structural = key === 'bokehBlades' || key === 'bokehRotation';
+      if (!structural || commitStructural) renderer?.setRenderSettings(state.render);
+    };
+    input.addEventListener('input', () => applyValue(false));
+    input.addEventListener('change', () => applyValue(true));
+  });
+
   qs<HTMLSelectElement>('#environment').addEventListener('change', (event) => {
     state.render.environment = (event.currentTarget as HTMLSelectElement).value as RenderSettings['environment'];
+    renderer?.clearCustomEnvironment();
+    environmentImageLabel = '내장 절차 파노라마 · 2:1';
+    renderer?.usePresetEnvironment(state.render.environment);
     renderer?.setRenderSettings(state.render);
+    updateRenderUI();
   });
   qs<HTMLSelectElement>('#quality').addEventListener('change', (event) => {
     state.render.quality = (event.currentTarget as HTMLSelectElement).value as RenderSettings['quality'];
     renderer?.setRenderSettings(state.render);
     showToast(state.render.quality === 'cinematic' ? '시네마틱 샘플링을 적용했습니다.' : '균형 품질로 전환했습니다.');
+  });
+  qs<HTMLSelectElement>('#bokeh-shape').addEventListener('change', (event) => {
+    state.render.bokehShape = (event.currentTarget as HTMLSelectElement).value as RenderSettings['bokehShape'];
+    renderer?.setRenderSettings(state.render);
+    updateRenderUI();
+  });
+  qs<HTMLButtonElement>('#focus-target').addEventListener('click', () => {
+    if (!renderer) return;
+    state.render.focusDistance = Math.min(50, Math.max(0.5, renderer.getTargetFocusDistance()));
+    renderer.setRenderSettings(state.render);
+    updateRenderUI();
+    showToast(`현재 피사체에 ${state.render.focusDistance.toFixed(1)}m 초점을 맞췄습니다.`);
+  });
+  qs<HTMLButtonElement>('#environment-upload').addEventListener('click', () => qs<HTMLInputElement>('#environment-file').click());
+  qs<HTMLInputElement>('#environment-file').addEventListener('change', async (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !renderer) return;
+    try {
+      environmentImageLabel = '파노라마 분석 중…';
+      updateRenderUI();
+      const info = await renderer.loadEnvironmentImage(file);
+      state.render.environmentBackground = true;
+      renderer.setRenderSettings(state.render);
+      const ratio = info.width / info.height;
+      environmentImageLabel = `${info.name} · ${info.width}×${info.height}${info.hdr ? ' HDR' : ''}`;
+      updateRenderUI();
+      showToast(Math.abs(ratio - 2) < 0.18
+        ? '사용자 파노라마를 환경조명과 배경에 적용했습니다.'
+        : '이미지를 적용했습니다. 자연스러운 환경맵은 2:1 파노라마를 권장합니다.');
+    } catch (error) {
+      console.error(error);
+      environmentImageLabel = '불러오기 실패 · 64×32 이상의 JPG·PNG·WebP·HDR 필요';
+      updateRenderUI();
+      showToast('환경 이미지를 불러오지 못했습니다.');
+    }
+  });
+  qs<HTMLButtonElement>('#environment-clear').addEventListener('click', () => {
+    renderer?.clearCustomEnvironment();
+    environmentImageLabel = '내장 절차 파노라마 · 2:1';
+    updateRenderUI();
+    showToast('내장 환경 파노라마로 복원했습니다.');
   });
 
   playButton.addEventListener('click', () => {

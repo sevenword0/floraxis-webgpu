@@ -147,8 +147,35 @@ export interface RenderSettings {
   contactShadows: boolean;
   bloom: boolean;
   softShadows: boolean;
+  depthOfField: boolean;
+  environmentBackground: boolean;
   environment: 'studio' | 'dawn' | 'moon';
   quality: 'balanced' | 'cinematic';
+  /** Perspective-camera vertical field of view in degrees. */
+  cameraFov: number;
+  /** Multiplier applied to image-based lighting. */
+  environmentIntensity: number;
+  /** Multiplier applied only to the visible panorama. */
+  backgroundIntensity: number;
+  /** Visible panorama blur in the normalized Three.js scene range. */
+  backgroundBlur: number;
+  /** Shared environment/background yaw in degrees. */
+  environmentRotation: number;
+  /** Distance from the camera to the focal plane in world units. */
+  focusDistance: number;
+  /** Distance away from the focal plane before full defocus. */
+  focusRange: number;
+  /** Artistic aperture blur radius. */
+  bokehScale: number;
+  bokehShape: 'circle' | 'polygon' | 'star' | 'heart';
+  /** Aperture blades for polygon and star bokeh. */
+  bokehBlades: number;
+  /** Aperture-mask rotation in degrees. */
+  bokehRotation: number;
+  /** Gamma applied before aperture convolution to shape bokeh highlights. */
+  bokehGamma: number;
+  /** Gamma applied to the final out-of-focus region. */
+  defocusGamma: number;
 }
 
 export type SceneMode = 'specimen' | 'field';

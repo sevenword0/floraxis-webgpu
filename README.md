@@ -19,6 +19,10 @@ WebGPU 기반 실시간 개화 시뮬레이터입니다. 연구 자료에서 확
 - 봉오리 크기, 닫힌 꽃잎 비율, 기부 팽창, 가장자리 성장, 개방 시점 커스터마이징
 - 커스텀 프리셋 브라우저 저장, JSON 내보내기/가져오기
 - 꽃밭의 개별 꽃을 cm 단위로 편집하고 클립보드 또는 독립 JSON 파일로 복사·적용
+- 18–85° 카메라 화각과 현재 피사체 초점 맞춤
+- 환경광·배경 밝기·파노라마 흐림·회전 및 JPG·PNG·WebP·HDR 환경 이미지 불러오기
+- 초점 거리·초점 범위·보케 크기와 원형·3–12날 다각형·별·하트 조리개 설정
+- 보케 컨볼루션 전 감마와 최종 비초점 영역 감마의 독립 조절
 - 식물학 구조와 개화 메커니즘을 보여 주는 연구 노트
 - 반응형 데스크톱/모바일 인터페이스
 
@@ -43,7 +47,7 @@ WebGPU 기반 실시간 개화 시뮬레이터입니다. 연구 자료에서 확
 
 Floraxis는 Three.js의 최신 WebGPU 렌더러와 TSL(Render Pipeline)을 사용합니다.
 
-- 절차적 RoomEnvironment 기반 IBL 환경맵 조명
+- 절차적 RoomEnvironment IBL과 내장 2:1 파노라마, 사용자 파노라마 PMREM 조명
 - SSGI(Screen-Space Global Illumination)
 - SSR(Screen-Space Reflections)
 - GTAO(Ground Truth Ambient Occlusion)
@@ -52,6 +56,7 @@ Floraxis는 Three.js의 최신 WebGPU 렌더러와 TSL(Render Pipeline)을 사�
 - 절차적 주맥·측맥 normal map과 실제 측면 셸을 결합한 꽃잎 두께 표현
 - 잔풀·수풀·돌을 각각 한 번에 그리는 WebGPU 인스턴싱과 동적 바람 행렬
 - 2K PCF 소프트 섀도 맵
+- 깊이 텍스처 기반 WebGPU DOF, 사용자 지정 조리개 커널과 보케/비초점 감마
 - Bloom, ACES tone mapping, SMAA
 
 SSGI에 필요한 GPU 기능이 없으면 해당 효과만 자동으로 비활성화되며 나머지 WebGPU 렌더링은 유지됩니다.
@@ -115,7 +120,7 @@ npm run preview
 - [Are capitula inflorescences? — Helianthus annuus development](https://academic.oup.com/aob/article/137/1/47/8195846)
 - [WebGPURenderer — Three.js manual](https://threejs.org/manual/en/webgpurenderer)
 
-모든 3D 형태와 재질은 런타임에 절차적으로 생성되며 외부 모델·텍스처 자산을 사용하지 않습니다.
+기본 3D 형태·재질·파노라마는 런타임에 절차적으로 생성됩니다. 사용자가 불러온 환경 이미지는 현재 브라우저 세션에서만 조명과 배경에 사용됩니다.
 
 ## License
 
