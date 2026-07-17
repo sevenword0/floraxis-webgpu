@@ -206,6 +206,7 @@ export class FlowerField implements Bloomable {
       ...settings,
       speciesIds: [...settings.speciesIds],
       colorRanges: Object.fromEntries(Object.entries(settings.colorRanges ?? {}).map(([key, value]) => [key, { ...value }])),
+      stemScales: { ...(settings.stemScales ?? {}) },
       individuals: Object.fromEntries(Object.entries(settings.individuals ?? {}).map(([key, value]) => [key, { ...value }])),
     };
     this.root.name = 'preset-flower-field';
@@ -557,9 +558,11 @@ export class FlowerField implements Bloomable {
   private stemRadius(batch: SpeciesBatch, plant: FieldPlant): number {
     const m = batch.preset.morphology;
     const botanicalRadius = m.stemRadius * THREE.MathUtils.clamp(plant.visualHeight / Math.max(0.3, m.stemHeight), 0.38, 2.3);
-    if (plant.layoutZone === 'tunnel') return Math.min(0.062, botanicalRadius * 0.58);
-    if (plant.layoutZone === 'wall') return Math.min(0.078, botanicalRadius * 0.72);
-    return botanicalRadius;
+    const stemScale = THREE.MathUtils.clamp(plant.stemScale, 0.35, 2.2);
+    const adjustedRadius = botanicalRadius * stemScale;
+    if (plant.layoutZone === 'tunnel') return Math.min(0.062 * stemScale, adjustedRadius * 0.58);
+    if (plant.layoutZone === 'wall') return Math.min(0.078 * stemScale, adjustedRadius * 0.72);
+    return adjustedRadius;
   }
 
   private setCylinderBetween(

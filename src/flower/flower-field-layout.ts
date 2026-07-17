@@ -51,6 +51,7 @@ export interface IndividualFlowerExport {
 
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+export const clampStemScale = (value: number): number => Math.min(2.2, Math.max(0.35, value));
 
 const normalizedSpecies = (speciesIds: string[]): string[] => {
   const unique = Array.from(new Set(speciesIds.filter(Boolean)));
@@ -156,6 +157,7 @@ const resolvePlantValues = (
   override: IndividualFlowerSettings | undefined,
   random: () => number,
   wind: number,
+  speciesStemScale: number,
 ): Omit<FieldPlant, 'index' | 'presetId' | 'x' | 'z' | 'groundY' | 'yaw' | 'bloomDelay' | 'windPhase' | 'lod' | 'flowerColor' | 'layoutZone' | 'layoutSide' | 'supportLeanDeg' | 'supportLeanAzimuthDeg'> => {
   const architecture = resolveBotanicalArchitecture(preset);
   const safeOverride = override ? sanitizeIndividualFlowerSettings(override, preset) : undefined;
@@ -179,7 +181,7 @@ const resolvePlantValues = (
   const windAllowance = Math.min(0.32, Math.max(0, wind) * visualHeight * 0.028);
   return {
     scale: 1,
-    stemScale: 1,
+    stemScale: safeOverride?.stemScale ?? speciesStemScale,
     heightCm,
     flowerDiameterCm,
     visualHeight,
@@ -294,7 +296,8 @@ export const generateFieldLayout = (
       ? rawOverride.presetId
       : assignedPresetId;
     const preset = presetById.get(presetId) ?? presets[0];
-    const values = resolvePlantValues(index, preset, rawOverride, random, settings.wind);
+    const speciesStemScale = clampStemScale(settings.stemScales?.[presetId] ?? 1);
+    const values = resolvePlantValues(index, preset, rawOverride, random, settings.wind, speciesStemScale);
     const anchor = anchors[index];
     const placementRandom = seededRandom(Math.imul(seed ^ (index + 1), 0x27d4eb2d) ^ 0x165667b1);
     const usableRadius = Math.max(0.08, radius - spacing * 0.42);
@@ -394,6 +397,7 @@ export const exportIndividualFlower = (plant: FieldPlant): IndividualFlowerExpor
     presetId: plant.presetId,
     heightCm: Number(plant.heightCm.toFixed(2)),
     flowerDiameterCm: Number(plant.flowerDiameterCm.toFixed(2)),
+    stemScale: Number(plant.stemScale.toFixed(3)),
     headTiltDeg: Number(plant.headTiltDeg.toFixed(1)),
     headAzimuthDeg: Number(plant.headAzimuthDeg.toFixed(1)),
     pedicelLengthCm: Number(plant.pedicelLengthCm.toFixed(2)),

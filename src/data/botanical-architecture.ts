@@ -79,6 +79,7 @@ export const sanitizeIndividualFlowerSettings = (
     ...(value.presetId ? { presetId: value.presetId } : {}),
     ...(Number.isFinite(value.heightCm) ? { heightCm: clamp(value.heightCm!, 8, 3000) } : {}),
     ...(Number.isFinite(value.flowerDiameterCm) ? { flowerDiameterCm: clamp(value.flowerDiameterCm!, 1.5, 120) } : {}),
+    ...(Number.isFinite(value.stemScale) ? { stemScale: clamp(value.stemScale!, 0.35, 2.2) } : {}),
     ...(Number.isFinite(value.headTiltDeg) ? { headTiltDeg: clamp(value.headTiltDeg!, 0, 135) } : {}),
     ...(Number.isFinite(value.headAzimuthDeg) ? { headAzimuthDeg: ((value.headAzimuthDeg! % 360) + 360) % 360 } : {}),
     ...(Number.isFinite(value.pedicelLengthCm) ? { pedicelLengthCm: clamp(value.pedicelLengthCm!, 0, 60) } : {}),

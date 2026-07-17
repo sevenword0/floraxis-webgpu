@@ -76,6 +76,8 @@ const DEFAULT_COLOR_RANGES = Object.fromEntries(PRESETS.map((preset) => [preset.
   strength: preset.id === 'hydrangea' ? 0.58 : preset.id === 'wisteria' ? 0.36 : 0.18,
 }]));
 
+const DEFAULT_STEM_SCALES = Object.fromEntries(PRESETS.map((preset) => [preset.id, 1]));
+
 const DEFAULT_FIELD: FieldSettings = {
   count: 120,
   radius: 6.5,
@@ -95,6 +97,7 @@ const DEFAULT_FIELD: FieldSettings = {
   seed: 240617,
   speciesIds: PRESETS.map((preset) => preset.id),
   colorRanges: DEFAULT_COLOR_RANGES,
+  stemScales: DEFAULT_STEM_SCALES,
   individuals: {},
 };
 
@@ -111,6 +114,7 @@ const state: AppState = {
     ...DEFAULT_FIELD,
     speciesIds: [...DEFAULT_FIELD.speciesIds],
     colorRanges: Object.fromEntries(Object.entries(DEFAULT_FIELD.colorRanges).map(([key, value]) => [key, { ...value }])),
+    stemScales: { ...DEFAULT_FIELD.stemScales },
     individuals: {},
   },
 };
@@ -257,6 +261,10 @@ const updateFieldColorUI = (): void => {
   strength.value = String(range.strength);
   updateRangeVisual(strength);
   qs<HTMLOutputElement>('#field-color-strength-output').value = `${Math.round(range.strength * 100)}%`;
+  const stemScale = qs<HTMLInputElement>('#field-stem-scale');
+  stemScale.value = String(state.field.stemScales[preset.id] ?? 1);
+  updateRangeVisual(stemScale);
+  qs<HTMLOutputElement>('#field-stem-scale-output').value = `${Math.round(Number(stemScale.value) * 100)}%`;
 };
 
 const renderStageControls = (): void => {
@@ -384,6 +392,7 @@ const selectIndividualSpecies = (presetId: string): void => {
     presetId: preset.id,
     heightCm: architecture.defaultHeightCm,
     flowerDiameterCm: architecture.defaultFlowerDiameterCm,
+    stemScale: state.field.stemScales[preset.id] ?? 1,
     headTiltDeg: architecture.headTiltDeg,
     headAzimuthDeg: architecture.headAzimuthDeg ?? getSelectedFlower().headAzimuthDeg,
     pedicelLengthCm: architecture.pedicelLengthCm,
@@ -834,6 +843,18 @@ const wireEvents = (): void => {
     state.field.colorRanges[preset.id] = { ...range, strength: Number((event.currentTarget as HTMLInputElement).value) };
     updateFieldColorUI();
     scheduleFieldRebuild();
+  });
+  qs<HTMLInputElement>('#field-stem-scale').addEventListener('input', (event) => {
+    state.field.stemScales[selectedColorSpeciesId] = Number((event.currentTarget as HTMLInputElement).value);
+    updateFieldColorUI();
+    scheduleFieldRebuild();
+  });
+  qs<HTMLButtonElement>('#field-stem-reset').addEventListener('click', () => {
+    const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];
+    state.field.stemScales[preset.id] = 1;
+    updateFieldColorUI();
+    scheduleFieldRebuild();
+    showToast(`${preset.name}의 줄기 두께를 종 기본값으로 초기화했습니다.`);
   });
   qs<HTMLButtonElement>('#field-color-reset').addEventListener('click', () => {
     const preset = PRESETS.find((item) => item.id === selectedColorSpeciesId) ?? PRESETS[0];

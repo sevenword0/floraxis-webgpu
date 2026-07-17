@@ -30,6 +30,7 @@ const settings: FieldSettings = {
   seed: 8128,
   speciesIds: ['rose', 'tulip', 'lily'],
   colorRanges: {},
+  stemScales: {},
   individuals: {},
 };
 
@@ -171,6 +172,7 @@ describe('preset flower-field layout', () => {
           presetId: 'sunflower',
           heightCm: 240,
           flowerDiameterCm: 16,
+          stemScale: 1.7,
           headTiltDeg: 74,
           leafCount: 11,
           branchCount: 3,
@@ -181,6 +183,7 @@ describe('preset flower-field layout', () => {
     expect(plant.presetId).toBe('sunflower');
     expect(plant.heightCm).toBe(240);
     expect(plant.flowerDiameterCm).toBe(16);
+    expect(plant.stemScale).toBe(1.7);
     expect(plant.headTiltDeg).toBe(74);
     expect(plant.leafCount).toBe(11);
 
@@ -189,9 +192,29 @@ describe('preset flower-field layout', () => {
       presetId: 'sunflower',
       heightCm: 240,
       flowerDiameterCm: 16,
+      stemScale: 1.7,
       headTiltDeg: 74,
     });
     expect(parseIndividualFlowerExport({ schema: 'other', version: 1 })).toBeUndefined();
+  });
+
+  it('applies deterministic species stem scales and clamps imported individual overrides', () => {
+    const speciesScaled = generateFieldLayout({
+      ...settings,
+      speciesIds: ['rose', 'tulip'],
+      stemScales: { rose: 0.55, tulip: 1.85 },
+    }, PRESETS);
+    expect(speciesScaled.filter((plant) => plant.presetId === 'rose').every((plant) => plant.stemScale === 0.55)).toBe(true);
+    expect(speciesScaled.filter((plant) => plant.presetId === 'tulip').every((plant) => plant.stemScale === 1.85)).toBe(true);
+
+    const overridden = generateFieldLayout({
+      ...settings,
+      speciesIds: ['rose'],
+      stemScales: { rose: 0.8 },
+      individuals: { 0: { presetId: 'rose', stemScale: 99 } },
+    }, PRESETS);
+    expect(overridden[0].stemScale).toBe(2.2);
+    expect(overridden.slice(1).every((plant) => plant.stemScale === 0.8)).toBe(true);
   });
 
   it('maps delayed bloom to exact global endpoints', () => {

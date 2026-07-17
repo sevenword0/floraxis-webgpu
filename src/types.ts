@@ -202,6 +202,8 @@ export interface IndividualFlowerSettings {
   presetId?: string;
   heightCm?: number;
   flowerDiameterCm?: number;
+  /** Multiplier applied to the selected species' botanical stem radius. */
+  stemScale?: number;
   headTiltDeg?: number;
   headAzimuthDeg?: number;
   pedicelLengthCm?: number;
@@ -248,6 +250,8 @@ export interface FieldSettings {
   speciesIds: string[];
   /** Per-species colour intervals; missing entries retain the preset palette. */
   colorRanges: Record<string, FieldColorRange>;
+  /** Per-species multipliers applied to the preset stem radius. */
+  stemScales: Record<string, number>;
   /** Per-index settings retained across deterministic field rebuilds. */
   individuals: Record<string, IndividualFlowerSettings>;
 }
