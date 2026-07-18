@@ -131,6 +131,11 @@ describe('petal geometry', () => {
     );
     expect(material.normalMap?.name).toBe('Floraxis petal veins normal map');
     expect(material.normalScale.x).toBeGreaterThan(0.25);
+    expect(material.metalness).toBe(0);
+    expect(material.ior).toBeGreaterThanOrEqual(1.4);
+    expect(material.clearcoat).toBeGreaterThan(0.02);
+    expect(material.clearcoat).toBeLessThanOrEqual(0.16);
+    expect(material.specularIntensity).toBeLessThan(0.67);
     material.dispose();
     normalMap.dispose();
   });

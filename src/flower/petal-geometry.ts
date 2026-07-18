@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { color, float } from 'three/tsl';
 import { DEFAULT_GROWTH_PROFILE } from '../growth-model';
+import { resolveNaturalSurfaceOptics } from '../render/physical-lighting';
 import type { BloomGrowthProfile, FlowerColors, FlowerMorphology, PetalShape } from '../types';
 
 type PetalGrowthGeometry = Pick<
@@ -432,10 +433,16 @@ export const createPetalMaterial = (
   colors: FlowerColors,
   morphology: Pick<FlowerMorphology, 'roughness' | 'sssStrength'>,
 ): THREE.MeshSSSNodeMaterial => {
+  const cuticle = resolveNaturalSurfaceOptics(
+    morphology.roughness,
+    0.18 + morphology.sssStrength * 0.34,
+    morphology.sssStrength,
+  );
   const material = new THREE.MeshSSSNodeMaterial({
     color: 0xffffff,
     roughness: morphology.roughness,
     metalness: 0,
+    ...cuticle,
     side: THREE.FrontSide,
     vertexColors: true,
   });

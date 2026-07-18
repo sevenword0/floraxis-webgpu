@@ -55,18 +55,33 @@ WebGPU 기반 실시간 개화 시뮬레이터입니다. 연구 자료에서 확
 Floraxis는 Three.js의 최신 WebGPU 렌더러와 TSL(Render Pipeline)을 사용합니다.
 
 - 절차적 RoomEnvironment IBL과 내장 2:1 파노라마, 사용자 파노라마 PMREM 조명
+- 화면에 보이는 내장 파노라마와 동일 텍스처로 생성한 PMREM IBL, 환경 회전을 따라 움직이는 직접광 리그
 - SSGI(Screen-Space Global Illumination)
 - SSR(Screen-Space Reflections)
 - GTAO(Ground Truth Ambient Occlusion)
 - SSS(Screen-Space Contact Shadows) + 소프트 블러
 - `MeshSSSNodeMaterial` 기반 꽃잎 subsurface scattering
+- 비금속 꽃잎·잎의 IOR, 제한된 큐티클 clearcoat, 종별 거칠기·왁스층을 분리한 자연 유전체 재질
 - 절차적 주맥·측맥 normal map과 실제 측면 셸을 결합한 꽃잎 두께 표현
 - 잔풀·수풀·돌을 각각 한 번에 그리는 WebGPU 인스턴싱과 동적 바람 행렬
-- 2K PCF 소프트 섀도 맵
+- 2단 practical-split CSM과 적응형 512/1024/2048 PCF 소프트 섀도 맵
 - 깊이 텍스처 기반 WebGPU DOF, 사용자 지정 조리개 커널과 보케/비초점 감마
-- Bloom, ACES tone mapping, SMAA
+- velocity/depth 기반 TRAA, Bloom, ACES tone mapping
 
-SSGI에 필요한 GPU 기능이 없으면 해당 효과만 자동으로 비활성화되며 나머지 WebGPU 렌더링은 유지됩니다.
+SSGI에 필요한 GPU 기능이 없으면 해당 효과만 자동으로 비활성화됩니다. WebGPU를 사용할 수 없으면 WebGL 2 백엔드로 폴백하며, Three.js r185 WebGL 셰이더 제약이 있는 SSR과 미지원 SSGI는 자동으로 꺼집니다.
+
+### Lighting QA Lab
+
+본 앱 상단의 태양 아이콘 또는 `/lighting-test.html`에서 실제 제품 렌더러를 사용하는 조명 테스트 앱을 열 수 있습니다.
+
+- 유전체/금속 거칠기 기준구와 18% 회색 카드
+- 2단 CSM 경계와 얇은 잎·기둥 그림자 장면
+- 움직임 벡터, TRAA, SSGI 이력 잔상을 확인하는 시간 안정성 장면
+- Production/Baseline/GI/Reflection A/B 프로필과 개별 효과 토글
+- 1초 워밍업 + 5초 측정의 median, p95, 1% low, GPU timing 판정
+- `?backend=webgl` 강제 폴백 검증
+
+사용법과 현재 검증 결과는 [Lighting QA 테스트 앱 가이드](./docs/lighting-qa-test-app-ko.md), 기술 타당성은 [Unreal 조명 기술의 WebGPU 적용 검토](./docs/unreal-lighting-webgpu-feasibility-ko.md)에 정리했습니다.
 
 ## 식물학 모델
 
@@ -103,6 +118,23 @@ npm run preview
 ```
 
 최신 Chrome 또는 Edge에서 하드웨어 가속과 WebGPU가 활성화되어 있어야 합니다.
+
+### Windows 더블클릭 실행
+
+Windows 탐색기에서 [Floraxis_조명_QA_실행.cmd](./Floraxis_조명_QA_실행.cmd)를 더블클릭하면 Lighting QA Lab이 기본 브라우저로 자동 실행됩니다.
+
+- 첫 실행에 `node_modules`가 없으면 `npm install`을 자동 수행
+- `http://127.0.0.1:8432/lighting-test.html`에서 strict-port Vite 서버 실행
+- 이미 Floraxis가 실행 중이면 새 서버를 만들지 않고 기존 페이지를 열기
+- 다른 프로그램이 8432 포트를 사용하면 해당 프로세스를 종료하지 않고 오류 안내
+- 실행 창을 닫거나 `Ctrl+C`를 누르면 서버 종료
+
+런처 자가진단과 WebGL 2 폴백 실행:
+
+```powershell
+.\Floraxis_조명_QA_실행.cmd -CheckOnly
+.\Floraxis_조명_QA_실행.cmd -Backend webgl
+```
 
 ## 조작
 

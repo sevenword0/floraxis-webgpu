@@ -60,7 +60,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .topbar-divider { width: 1px; height: 12px; background: var(--line); }
 .topbar-actions { display: flex; align-items: center; gap: 7px; }
 .icon-button, .capture-button { height: 38px; border: 1px solid var(--line); background: rgba(255,255,255,0.025); border-radius: 9px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: 160ms ease; }
-.icon-button { width: 38px; }
+.icon-button { width: 38px; color: #b9c8c1; text-decoration: none; }
 .icon-button svg, .capture-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; }
 .capture-button { gap: 8px; padding: 0 13px; color: #162019; background: #dce9df; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; }
 .capture-button svg { width: 15px; }
@@ -312,7 +312,7 @@ input[type="range"]:disabled { opacity: .3; cursor: not-allowed; }
 }
 
 @media (max-width: 520px) {
-  .topbar-actions .icon-button:first-child { display: none; }
+  .topbar-actions #research-open { display: none; }
   .timeline-main { grid-template-columns: 36px 1fr 29px; gap: 9px; }
   .play-button { width: 36px; height: 36px; }
   .timeline-meta { margin-top: 7px; padding-top: 7px; }

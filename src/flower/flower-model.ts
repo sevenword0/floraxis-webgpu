@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { color, float } from 'three/tsl';
 import { resolveBotanicalArchitecture } from '../data/botanical-architecture';
 import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } from '../growth-model';
+import { resolveNaturalSurfaceOptics } from '../render/physical-lighting';
 import type { Bloomable, BloomGrowthProfile, FlowerPreset } from '../types';
 import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
@@ -213,7 +214,14 @@ export class FlowerModel implements Bloomable {
       return { angle, start, end };
     });
 
-    const leafMaterial = this.track(new THREE.MeshSSSNodeMaterial({ color: this.preset.colors.stem, roughness: 0.8, side: THREE.DoubleSide }));
+    const leafRoughness = 0.74;
+    const leafMaterial = this.track(new THREE.MeshSSSNodeMaterial({
+      color: this.preset.colors.stem,
+      roughness: leafRoughness,
+      metalness: 0,
+      ...resolveNaturalSurfaceOptics(leafRoughness, 0.58, 0.55),
+      side: THREE.DoubleSide,
+    }));
     leafMaterial.thicknessColorNode = color('#9ccf80');
     leafMaterial.thicknessAttenuationNode = float(0.38);
     leafMaterial.thicknessScaleNode = float(6);

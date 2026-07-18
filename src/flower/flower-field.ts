@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import type { Bloomable, BloomGrowthProfile, FieldSettings, FlowerPreset } from '../types';
 import { resolveBotanicalArchitecture } from '../data/botanical-architecture';
 import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } from '../growth-model';
+import { resolveNaturalSurfaceOptics } from '../render/physical-lighting';
 import { remapBloom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
@@ -451,9 +452,12 @@ export class FlowerField implements Bloomable {
       leafStemMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(stemGeometry, stemMaterial, leafInstances.length));
       const leafGeometry = this.track(createLeafGeometry(architecture.leafShape));
       const leafColor = new THREE.Color(preset.colors.stem).lerp(new THREE.Color('#7ca26a'), 0.28);
-      const leafMaterial = this.track(new THREE.MeshStandardNodeMaterial({
+      const leafRoughness = 0.76;
+      const leafMaterial = this.track(new THREE.MeshPhysicalNodeMaterial({
         color: leafColor,
-        roughness: 0.82,
+        roughness: leafRoughness,
+        metalness: 0,
+        ...resolveNaturalSurfaceOptics(leafRoughness, 0.46, 0.22),
         side: THREE.DoubleSide,
       }));
       leafMesh = this.prepareInstancedMesh(new THREE.InstancedMesh(leafGeometry, leafMaterial, leafInstances.length));

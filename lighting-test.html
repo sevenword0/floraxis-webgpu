@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#09110f" />
+    <meta name="description" content="Floraxis WebGPU 하이브리드 조명 파이프라인의 재질, CSM 그림자, SSGI, SSR, TRAA와 성능을 검증하는 테스트 앱" />
+    <title>Floraxis Lighting QA Lab</title>
+  </head>
+  <body>
+    <div id="lighting-app">
+      <header class="lab-header">
+        <a class="lab-brand" href="./index.html" aria-label="Floraxis 본 앱으로 돌아가기">
+          <span class="brand-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span><strong>FLORAXIS</strong><small>LIGHTING QA LAB · WEBGPU</small></span>
+        </a>
+        <div class="header-health" aria-live="polite">
+          <span id="backend-chip" class="health-chip is-loading"><i></i>GPU 초기화</span>
+          <span id="feature-chip" class="health-chip">기능 확인 중</span>
+          <span id="error-chip" class="health-chip is-pass">오류 0</span>
+        </div>
+        <nav class="header-actions" aria-label="앱 이동과 렌더링 백엔드">
+          <button id="backend-auto" type="button" title="자동 백엔드로 다시 열기">AUTO GPU</button>
+          <button id="backend-webgl" type="button" title="WebGL 2 폴백으로 다시 열기">WEBGL 2</button>
+          <a href="./index.html">본 앱으로</a>
+        </nav>
+      </header>
+
+      <main class="lab-layout">
+        <section class="viewport-card" aria-label="실시간 조명 기준 장면">
+          <div id="lighting-render-host"></div>
+          <div class="viewport-grid" aria-hidden="true"></div>
+
+          <div class="scene-copy">
+            <p id="scene-kicker">01 · MATERIAL ENERGY</p>
+            <h1 id="scene-title">거칠기·금속성 기준구</h1>
+            <p id="scene-description">실제 제품 렌더러의 조명 에너지와 반사 응답을 비교합니다.</p>
+          </div>
+
+          <div class="axis-hint" aria-hidden="true">
+            <span><i class="axis-x"></i>ROUGHNESS 0.05 → 1.0</span>
+            <span><i class="axis-y"></i>TOP DIELECTRIC · BOTTOM METAL</span>
+          </div>
+
+          <div class="metric-strip" aria-live="polite">
+            <article><span>FRAME</span><strong id="metric-fps">—</strong><small>FPS</small></article>
+            <article><span>GPU</span><strong id="metric-gpu">—</strong><small>MS</small></article>
+            <article><span>DRAW</span><strong id="metric-draws">—</strong><small>CALLS</small></article>
+            <article><span>GEOMETRY</span><strong id="metric-triangles">—</strong><small>TRIS</small></article>
+            <article><span>INTERNAL</span><strong id="metric-resolution">—</strong><small id="metric-tier">TIER</small></article>
+          </div>
+
+          <div id="loading-screen" class="loading-screen" aria-live="polite">
+            <div class="loading-orbit" aria-hidden="true"><i></i><i></i><b></b></div>
+            <p>PRODUCTION LIGHTING PIPELINE</p>
+            <strong>CSM · MRT · SSGI · SSR · TRAA 구성 중</strong>
+          </div>
+
+          <div id="fatal-card" class="fatal-card" hidden>
+            <span>RENDERER ERROR</span>
+            <h2>GPU 렌더러를 시작하지 못했습니다</h2>
+            <p id="fatal-message"></p>
+            <button type="button" onclick="location.reload()">다시 시도</button>
+          </div>
+        </section>
+
+        <aside class="control-panel" aria-label="조명 테스트 제어판">
+          <div class="panel-heading">
+            <div><p>REAL-TIME VALIDATION</p><h2>테스트 콘솔</h2></div>
+            <span id="quality-badge">BALANCED</span>
+          </div>
+
+          <section class="control-section" aria-labelledby="scene-section-title">
+            <div class="section-title"><span>01</span><h3 id="scene-section-title">기준 장면</h3></div>
+            <div class="segmented scene-tabs" role="group" aria-label="기준 장면 선택">
+              <button type="button" class="is-active" data-scene="materials" aria-pressed="true">재질</button>
+              <button type="button" data-scene="shadows" aria-pressed="false">CSM 그림자</button>
+              <button type="button" data-scene="temporal" aria-pressed="false">시간 안정성</button>
+            </div>
+          </section>
+
+          <section class="control-section" aria-labelledby="profile-section-title">
+            <div class="section-title"><span>02</span><h3 id="profile-section-title">A/B 프로필</h3></div>
+            <div class="profile-grid" role="group" aria-label="조명 효과 프로필">
+              <button type="button" class="is-active" data-profile="production"><b>PRODUCTION</b><small>전체 하이브리드</small></button>
+              <button type="button" data-profile="baseline"><b>BASELINE</b><small>직접광 + IBL</small></button>
+              <button type="button" data-profile="gi"><b>GI STUDY</b><small>SSGI + AO</small></button>
+              <button type="button" data-profile="reflection"><b>REFLECTION</b><small>금속 SSR</small></button>
+            </div>
+          </section>
+
+          <section class="control-section" aria-labelledby="effect-section-title">
+            <div class="section-title"><span>03</span><h3 id="effect-section-title">제품 파이프라인</h3></div>
+            <div class="effect-grid">
+              <label><input type="checkbox" data-effect="ssgi" checked /><span><b>SSGI</b><small>간접광</small></span><i></i></label>
+              <label><input type="checkbox" data-effect="ssr" checked /><span><b>SSR</b><small>금속 반사</small></span><i></i></label>
+              <label><input type="checkbox" data-effect="ao" checked /><span><b>GTAO</b><small>환경 차폐</small></span><i></i></label>
+              <label><input type="checkbox" data-effect="contactShadows" checked /><span><b>SSS</b><small>접촉 그림자</small></span><i></i></label>
+              <label><input type="checkbox" data-effect="bloom" checked /><span><b>BLOOM</b><small>고휘도만</small></span><i></i></label>
+              <label><input type="checkbox" data-effect="softShadows" checked /><span><b>CSM</b><small>2 캐스케이드</small></span><i></i></label>
+              <label class="wide"><input type="checkbox" data-effect="environmentBackground" checked /><span><b>PANORAMA</b><small>IBL과 동일 환경 배경</small></span><i></i></label>
+            </div>
+          </section>
+
+          <section class="control-section" aria-labelledby="environment-section-title">
+            <div class="section-title"><span>04</span><h3 id="environment-section-title">환경·품질</h3></div>
+            <div class="select-grid">
+              <label>환경<select id="environment"><option value="studio">Botanical studio</option><option value="dawn">Warm dawn</option><option value="moon">Moon glasshouse</option></select></label>
+              <label>품질<select id="quality"><option value="balanced">Balanced</option><option value="cinematic">Cinematic</option></select></label>
+            </div>
+            <label class="range-control">
+              <span>환경 조명 강도 <output id="environment-intensity-output">100%</output></span>
+              <input id="environment-intensity" type="range" min="0" max="2" step="0.05" value="1" />
+            </label>
+            <div class="switch-row">
+              <label><input id="motion-toggle" type="checkbox" checked /><i></i><span>장면 움직임</span></label>
+              <label><input id="orbit-toggle" type="checkbox" /><i></i><span>카메라 자동 회전</span></label>
+            </div>
+            <div class="action-grid">
+              <button id="view-reset" type="button">시점 초기화 <kbd>R</kbd></button>
+              <button id="capture" type="button">PNG 캡처</button>
+            </div>
+          </section>
+
+          <section class="control-section benchmark-section" aria-labelledby="benchmark-section-title">
+            <div class="section-title"><span>05</span><h3 id="benchmark-section-title">6초 성능 검증</h3></div>
+            <div class="benchmark-head">
+              <div><strong id="benchmark-verdict">READY</strong><span id="benchmark-status">1초 워밍업 + 5초 측정</span></div>
+              <button id="benchmark-run" type="button">RUN TEST</button>
+            </div>
+            <div class="benchmark-progress"><i id="benchmark-progress"></i></div>
+            <div class="benchmark-results">
+              <span><small>MEDIAN</small><b id="result-median">—</b></span>
+              <span><small>P95</small><b id="result-p95">—</b></span>
+              <span><small>1% LOW</small><b id="result-low">—</b></span>
+              <span><small>GPU AVG</small><b id="result-gpu">—</b></span>
+            </div>
+            <p class="benchmark-note">판정 기준: p95 ≤ 20ms PASS, ≤ 33.34ms WARN. 브라우저 창 크기와 GPU 상태도 함께 기록하세요.</p>
+          </section>
+
+          <section class="control-section checklist-section" aria-labelledby="checklist-title">
+            <div class="section-title"><span>06</span><h3 id="checklist-title">육안 합격 기준</h3></div>
+            <ul id="visual-checks"></ul>
+          </section>
+        </aside>
+      </main>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/lighting-test/main.ts"></script>
+  </body>
+</html>

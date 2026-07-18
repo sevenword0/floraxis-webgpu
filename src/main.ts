@@ -14,7 +14,7 @@ import {
   type FieldPlant,
 } from './flower/flower-field-layout';
 import { resolveGrowthProfile } from './growth-model';
-import { BloomRenderer } from './render/bloom-renderer';
+import { BloomRenderer, type RendererFrameInfo } from './render/bloom-renderer';
 import type {
   AppState,
   BloomGrowthProfile,
@@ -1137,7 +1137,7 @@ const wireEvents = (): void => {
   new ResizeObserver(() => renderer?.resize()).observe(host);
 };
 
-const onFrame = (delta: number, elapsedMs: number, info: { fps: number; drawCalls: number; triangles: number }): void => {
+const onFrame = (delta: number, elapsedMs: number, info: RendererFrameInfo): void => {
   if (state.playing) {
     const bloomDuration = state.mode === 'field' ? 18 : state.preset.morphology.bloomDuration;
     const deltaBloom = delta * state.speed / Math.max(2, bloomDuration);
@@ -1155,7 +1155,9 @@ const onFrame = (delta: number, elapsedMs: number, info: { fps: number; drawCall
     updateTimeline();
   }
   if (elapsedMs - lastStatsUpdate > 500) {
-    fpsLabel.textContent = `${info.fps || '—'} FPS · ${info.drawCalls} DRAWS`;
+    const gpuTime = info.gpuMs === null ? `${info.drawCalls} DRAWS` : `${info.gpuMs.toFixed(1)} ms GPU`;
+    fpsLabel.textContent = `${info.fps || '—'} FPS · ${gpuTime} · ${Math.round(info.resolutionScale * 100)}%`;
+    fpsLabel.title = `${info.qualityTier.toUpperCase()} adaptive tier · ${info.drawCalls} draws · ${info.triangles} triangles`;
     lastStatsUpdate = elapsedMs;
   }
 };
@@ -1181,6 +1183,13 @@ const init = async (): Promise<void> => {
       input.closest('label')?.setAttribute('title', '이 GPU는 SSGI에 필요한 rg11b10ufloat-renderable 기능을 지원하지 않습니다.');
       showToast('이 GPU에서는 SSGI를 자동으로 비활성화했습니다.');
     }
+    if (!renderer.capabilities.ssr) {
+      state.render.ssr = false;
+      const input = qs<HTMLInputElement>('[data-render="ssr"]');
+      input.disabled = true;
+      input.closest('label')?.setAttribute('title', 'WebGL 2 폴백에서는 Three.js r185 SSR 셰이더 호환성 때문에 비활성화됩니다.');
+      showToast('WebGL 2 폴백에서는 SSR을 자동으로 비활성화했습니다.');
+    }
     renderer.setFlower(state.preset);
     renderer.setBloom(state.bloom);
     renderer.setRenderSettings(state.render);
@@ -1191,7 +1200,7 @@ const init = async (): Promise<void> => {
     console.error(error);
     loadingScreen.classList.add('is-hidden');
     compatibilityCard.hidden = false;
-    backendLabel.textContent = 'WEBGPU 지원 필요';
+    backendLabel.textContent = 'GPU 렌더러 초기화 실패';
   }
 };
 
