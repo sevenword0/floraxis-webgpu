@@ -307,31 +307,58 @@ const computeNormals = (positions: Float32Array, indices: number[]): Float32Arra
   return normals;
 };
 
+/** Encodes `deformed - reference` as an absolute morph target based on `base`. */
+const encodeAdditiveTarget = (
+  base: Float32Array,
+  deformed: Float32Array,
+  reference: Float32Array,
+): Float32Array => {
+  const target = new Float32Array(base.length);
+  for (let index = 0; index < base.length; index += 1) {
+    target[index] = base[index] + deformed[index] - reference[index];
+  }
+  return target;
+};
+
 export const resolvePetalThickness = (length: number): number => THREE.MathUtils.clamp(length * 0.014, 0.009, 0.026);
 
 export const createPetalGeometry = (options: PetalGeometryOptions): THREE.BufferGeometry => {
   const widthSegments = Math.round(THREE.MathUtils.clamp(options.segments?.width ?? 10, 3, 18));
   const lengthSegments = Math.round(THREE.MathUtils.clamp(options.segments?.length ?? 18, 5, 30));
-  const closedSurface = buildPositions(options, 'closed', widthSegments, lengthSegments);
   const targetPoses: PetalPose[] = options.unfurl ? ['released', 'unfurled', 'open'] : ['open'];
+  const poses: PetalPose[] = ['closed', ...targetPoses];
+  const poseSurfaces = poses.map((pose) => buildPositions(options, pose, widthSegments, lengthSegments));
+  const closedSurface = poseSurfaces[0];
   const sideCoil = THREE.MathUtils.clamp(options.unfurl?.sideCoil ?? 0, 0, 1.25);
-  const vortexSurface = sideCoil > 0.001
-    ? buildPositions(options, 'closed', widthSegments, lengthSegments, sideCoil)
+  const centreCoilSurfaces = sideCoil > 0.001
+    ? poses.map((pose) => buildPositions(options, pose, widthSegments, lengthSegments, sideCoil))
     : undefined;
-  const targetSurfaces = [
-    ...(vortexSurface ? [vortexSurface] : []),
-    ...targetPoses.map((pose) => buildPositions(options, pose, widthSegments, lengthSegments)),
-  ];
-  const targetNames = [...(vortexSurface ? ['vortex'] : []), ...targetPoses];
   const surfaceIndices = buildSurfaceIndices(widthSegments, lengthSegments);
-  const closedSurfaceNormals = computeNormals(closedSurface, surfaceIndices);
-  const targetSurfaceNormals = targetSurfaces.map((surface) => computeNormals(surface, surfaceIndices));
+  const poseSurfaceNormals = poseSurfaces.map((surface) => computeNormals(surface, surfaceIndices));
+  const centreCoilSurfaceNormals = centreCoilSurfaces?.map((surface) => computeNormals(surface, surfaceIndices));
   const thickness = options.thickness ?? resolvePetalThickness(options.length);
-  const closed = buildShellPositions(closedSurface, closedSurfaceNormals, thickness);
-  const targets = targetSurfaces.map((surface, index) => buildShellPositions(surface, targetSurfaceNormals[index], thickness));
+  const poseShells = poseSurfaces.map((surface, index) => (
+    buildShellPositions(surface, poseSurfaceNormals[index], thickness)
+  ));
+  const centreCoilShells = centreCoilSurfaces?.map((surface, index) => (
+    buildShellPositions(surface, centreCoilSurfaceNormals![index], thickness)
+  ));
+  const closed = poseShells[0];
+  const stageTargets = poseShells.slice(1);
+  const centreCoilTargets = centreCoilShells?.map((shell, index) => (
+    encodeAdditiveTarget(closed, shell, poseShells[index])
+  )) ?? [];
+  const targets = [...stageTargets, ...centreCoilTargets];
   const indices = buildShellIndices(surfaceIndices, widthSegments, lengthSegments);
   const closedNormals = computeNormals(closed, indices);
-  const targetNormals = targets.map((target) => computeNormals(target, indices));
+  const poseShellNormals = poseShells.map((shell) => computeNormals(shell, indices));
+  const centreCoilShellNormals = centreCoilShells?.map((shell) => computeNormals(shell, indices));
+  const targetNormals = [
+    ...poseShellNormals.slice(1),
+    ...(centreCoilShellNormals?.map((normal, index) => (
+      encodeAdditiveTarget(closedNormals, normal, poseShellNormals[index])
+    )) ?? []),
+  ];
   const surfaceCount = (widthSegments + 1) * (lengthSegments + 1);
   const count = surfaceCount * 2;
   const colors = new Float32Array(count * 3);
@@ -369,9 +396,16 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.userData.closedPetalLength = options.growth?.closedPetalLength ?? DEFAULT_GROWTH_PROFILE.closedPetalLength;
   geometry.userData.closedPetalWidth = options.growth?.closedPetalWidth ?? DEFAULT_GROWTH_PROFILE.closedPetalWidth;
   geometry.userData.petalFold = options.fold ?? 0;
-  geometry.userData.petalMorphStages = targetNames;
-  geometry.userData.vortexMorphIndex = vortexSurface ? 0 : -1;
-  geometry.userData.unfurlMorphOffset = vortexSurface ? 1 : 0;
+  const centreCoilMorphOffset = centreCoilTargets.length > 0 ? targetPoses.length : -1;
+  geometry.userData.petalMorphStages = [
+    ...targetPoses,
+    ...(centreCoilTargets.length > 0 ? poses.map((pose) => `centre-coil-${pose}`) : []),
+  ];
+  geometry.userData.vortexMorphIndex = centreCoilMorphOffset;
+  geometry.userData.unfurlMorphOffset = 0;
+  geometry.userData.centreCoilMorphOffset = centreCoilMorphOffset;
+  geometry.userData.centreCoilMorphCount = centreCoilTargets.length;
+  geometry.userData.centreCoilApplicationOrder = centreCoilTargets.length > 0 ? 'post-deformation' : 'none';
   geometry.userData.sideCoilCounterCurve = options.unfurl?.sideCoilCounterCurve ?? 0;
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();

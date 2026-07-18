@@ -14,6 +14,13 @@ export interface RoseVortexState {
   lift: number;
 }
 
+export type RoseCentreCoilMorphWeights = [
+  closed: number,
+  released: number,
+  unfurled: number,
+  open: number,
+];
+
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const DEG = Math.PI / 180;
 
@@ -67,4 +74,24 @@ export const evaluateRoseVortex = (
     radialTuck: sideCoil * (0.018 + normalizedLayer * 0.074),
     lift: sideCoil * (0.006 + normalizedLayer * 0.034),
   };
+};
+
+/**
+ * Distributes the centre-coil strength across pose-specific additive morphs.
+ * Each coil delta is generated after that pose's ordinary cup, fold, curl,
+ * growth, and wave deformation, so the weighted coil remains the final layer.
+ */
+export const evaluateRoseCentreCoilMorphWeights = (
+  unfurlWeights: readonly [released: number, unfurled: number, open: number],
+  sideCoil: number,
+): RoseCentreCoilMorphWeights => {
+  const released = clamp01(unfurlWeights[0]);
+  const unfurled = clamp01(unfurlWeights[1]);
+  const open = clamp01(unfurlWeights[2]);
+  const closed = Math.max(0, 1 - released - unfurled - open);
+  const poseTotal = Math.max(1e-8, closed + released + unfurled + open);
+  const strength = clamp01(sideCoil);
+  return [closed, released, unfurled, open].map((weight) => (
+    strength * weight / poseTotal
+  )) as RoseCentreCoilMorphWeights;
 };

@@ -8,7 +8,7 @@ import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
-import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
+import { evaluateRoseCentreCoilMorphWeights, evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
 import { createLeafGeometry } from './leaf-geometry';
 import { LeafAttachmentFrame, setLeafGrowthDirection } from './leaf-attachment';
 import {
@@ -28,7 +28,7 @@ interface RoseVortexMotion {
   layer: number;
   phase: number;
   strength: number;
-  morphOffset: number;
+  centreCoilMorphOffset: number;
 }
 
 interface PetalMotion {
@@ -445,7 +445,7 @@ export class FlowerModel implements Bloomable {
             layer: inner,
             phase: index / count,
             strength: m.innerCoil,
-            morphOffset: 1,
+            centreCoilMorphOffset: Number(geometry.userData.centreCoilMorphOffset),
           } : undefined,
           radialBase: clearance.radialBase,
           baseLift: clearance.layerLift,
@@ -815,11 +815,16 @@ export class FlowerModel implements Bloomable {
         + petal.laneLift * THREE.MathUtils.lerp(0.38, 1 + contactSeparation * 0.26, clearance)
         + (vortex?.lift ?? 0);
       if (unfurl) {
-        const morphOffset = petal.vortex?.morphOffset ?? 0;
-        if (petal.vortex) petal.mesh.morphTargetInfluences![0] = vortex?.sideCoil ?? 0;
-        petal.mesh.morphTargetInfluences![morphOffset] = unfurl.weights[0];
-        petal.mesh.morphTargetInfluences![morphOffset + 1] = unfurl.weights[1];
-        petal.mesh.morphTargetInfluences![morphOffset + 2] = unfurl.weights[2];
+        const influences = petal.mesh.morphTargetInfluences!;
+        influences[0] = unfurl.weights[0];
+        influences[1] = unfurl.weights[1];
+        influences[2] = unfurl.weights[2];
+        if (petal.vortex) {
+          const coilWeights = evaluateRoseCentreCoilMorphWeights(unfurl.weights, vortex?.sideCoil ?? 0);
+          for (let pose = 0; pose < coilWeights.length; pose += 1) {
+            influences[petal.vortex.centreCoilMorphOffset + pose] = coilWeights[pose];
+          }
+        }
       } else {
         petal.mesh.morphTargetInfluences![0] = local;
       }

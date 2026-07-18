@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { PRESETS } from '../data/presets';
-import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
+import {
+  evaluateRoseCentreCoilMorphWeights,
+  evaluateRoseVortex,
+  usesRoseVortex,
+} from './rose-vortex';
 
 describe('rose centre vortex', () => {
   it('survives parameter editing when a rose preset becomes custom', () => {
@@ -51,5 +55,20 @@ describe('rose centre vortex', () => {
     const earlyPhase = evaluateRoseVortex(0.52, 1, 0.05, 0.58);
     const latePhase = evaluateRoseVortex(0.52, 1, 0.95, 0.58);
     expect(latePhase.sideCoil).toBeGreaterThan(earlyPhase.sideCoil);
+  });
+
+  it('applies the centre coil after the currently blended unfurl poses', () => {
+    const early = evaluateRoseCentreCoilMorphWeights([0.35, 0, 0], 0.8);
+    const transition = evaluateRoseCentreCoilMorphWeights([0.25, 0.75, 0], 0.6);
+    const open = evaluateRoseCentreCoilMorphWeights([0, 0, 1], 0.42);
+
+    expect(early[0]).toBeCloseTo(0.52);
+    expect(early[1]).toBeCloseTo(0.28);
+    expect(transition[0]).toBe(0);
+    expect(transition[1]).toBeCloseTo(0.15);
+    expect(transition[2]).toBeCloseTo(0.45);
+    expect(transition[3]).toBe(0);
+    expect(open).toEqual([0, 0, 0, 0.42]);
+    expect(early.reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(0.8);
   });
 });

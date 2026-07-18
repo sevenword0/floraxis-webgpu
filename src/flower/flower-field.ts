@@ -7,7 +7,7 @@ import { remapBloom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
 import { evaluatePetalUnfurl } from './petal-unfurl';
-import { evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
+import { evaluateRoseCentreCoilMorphWeights, evaluateRoseVortex, usesRoseVortex } from './rose-vortex';
 import { createLeafGeometry } from './leaf-geometry';
 import { LeafAttachmentFrame, setLeafGrowthDirection } from './leaf-attachment';
 import { FieldTerrain } from './field-terrain';
@@ -33,7 +33,7 @@ import {
 interface FieldRoseVortexSpec {
   phase: number;
   strength: number;
-  morphOffset: number;
+  centreCoilMorphOffset: number;
 }
 
 interface FieldPetalSpec {
@@ -368,7 +368,7 @@ export class FlowerField implements Bloomable {
           vortex: usesVortex ? {
             phase: index / layerCount,
             strength: m.innerCoil,
-            morphOffset: 1,
+            centreCoilMorphOffset: 3,
           } : undefined,
         });
       }
@@ -956,11 +956,16 @@ export class FlowerField implements Bloomable {
       this.petalMatrix.multiply(this.meshPose.matrix);
       batch.petalMesh.setMatrixAt(index, this.petalMatrix);
       if (advanced && unfurl) {
-        const morphOffset = spec.vortex?.morphOffset ?? 0;
-        if (spec.vortex) batch.petalMorphDriver.morphTargetInfluences![0] = vortex?.sideCoil ?? 0;
-        batch.petalMorphDriver.morphTargetInfluences![morphOffset] = unfurl.weights[0];
-        batch.petalMorphDriver.morphTargetInfluences![morphOffset + 1] = unfurl.weights[1];
-        batch.petalMorphDriver.morphTargetInfluences![morphOffset + 2] = unfurl.weights[2];
+        const influences = batch.petalMorphDriver.morphTargetInfluences!;
+        influences[0] = unfurl.weights[0];
+        influences[1] = unfurl.weights[1];
+        influences[2] = unfurl.weights[2];
+        if (spec.vortex) {
+          const coilWeights = evaluateRoseCentreCoilMorphWeights(unfurl.weights, vortex?.sideCoil ?? 0);
+          for (let pose = 0; pose < coilWeights.length; pose += 1) {
+            influences[spec.vortex.centreCoilMorphOffset + pose] = coilWeights[pose];
+          }
+        }
       } else {
         batch.petalMorphDriver.morphTargetInfluences![0] = local;
       }

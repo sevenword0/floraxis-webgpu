@@ -64,30 +64,47 @@ describe('petal geometry', () => {
     const outer = makeGeometry(0);
     const inner = makeGeometry(1);
     const closed = outer.getAttribute('position');
-    const [vortex, released, unfurled, opened] = outer.morphAttributes.position!;
-    const innerOpened = inner.morphAttributes.position![3];
+    const [released, unfurled, opened, coilClosed, , , coilOpen] = outer.morphAttributes.position!;
+    const innerOpened = inner.morphAttributes.position![2];
     const tip = 18 * 11 + 5;
     const base = 3 * 11 + 5;
     const rollRow = 13 * 11;
     const positiveEdge = rollRow + 10;
     const negativeEdge = rollRow;
     const positiveDisplacement = Math.hypot(
-      vortex.getX(positiveEdge) - closed.getX(positiveEdge),
-      vortex.getZ(positiveEdge) - closed.getZ(positiveEdge),
+      coilClosed.getX(positiveEdge) - closed.getX(positiveEdge),
+      coilClosed.getZ(positiveEdge) - closed.getZ(positiveEdge),
     );
     const negativeDisplacement = Math.hypot(
-      vortex.getX(negativeEdge) - closed.getX(negativeEdge),
-      vortex.getZ(negativeEdge) - closed.getZ(negativeEdge),
+      coilClosed.getX(negativeEdge) - closed.getX(negativeEdge),
+      coilClosed.getZ(negativeEdge) - closed.getZ(negativeEdge),
+    );
+    const openPositiveDisplacement = Math.hypot(
+      coilOpen.getX(positiveEdge) - closed.getX(positiveEdge),
+      coilOpen.getZ(positiveEdge) - closed.getZ(positiveEdge),
+    );
+    const openNegativeDisplacement = Math.hypot(
+      coilOpen.getX(negativeEdge) - closed.getX(negativeEdge),
+      coilOpen.getZ(negativeEdge) - closed.getZ(negativeEdge),
     );
 
-    expect(outer.morphAttributes.position).toHaveLength(4);
-    expect(outer.morphAttributes.normal).toHaveLength(4);
-    expect(outer.userData.petalMorphStages).toEqual(['vortex', 'released', 'unfurled', 'open']);
-    expect(outer.userData.vortexMorphIndex).toBe(0);
-    expect(outer.userData.unfurlMorphOffset).toBe(1);
+    expect(outer.morphAttributes.position).toHaveLength(7);
+    expect(outer.morphAttributes.normal).toHaveLength(7);
+    expect(outer.userData.petalMorphStages).toEqual([
+      'released', 'unfurled', 'open',
+      'centre-coil-closed', 'centre-coil-released', 'centre-coil-unfurled', 'centre-coil-open',
+    ]);
+    expect(outer.userData.vortexMorphIndex).toBe(3);
+    expect(outer.userData.unfurlMorphOffset).toBe(0);
+    expect(outer.userData.centreCoilMorphOffset).toBe(3);
+    expect(outer.userData.centreCoilMorphCount).toBe(4);
+    expect(outer.userData.centreCoilApplicationOrder).toBe('post-deformation');
     expect(outer.userData.sideCoilCounterCurve).toBe(0.18);
     expect(negativeDisplacement).toBeGreaterThan(0.01);
     expect(positiveDisplacement).toBeGreaterThan(negativeDisplacement + 0.08);
+    expect(openNegativeDisplacement).toBeGreaterThan(0.01);
+    expect(openPositiveDisplacement).toBeGreaterThan(openNegativeDisplacement + 0.08);
+    expect(openPositiveDisplacement).not.toBeCloseTo(positiveDisplacement, 3);
     expect(released.getZ(base)).toBeGreaterThan(closed.getZ(base));
     expect(released.getZ(tip)).toBeGreaterThan(closed.getZ(tip));
     expect(unfurled.getZ(tip)).toBeGreaterThan(released.getZ(tip));
