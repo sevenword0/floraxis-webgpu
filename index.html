@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#0d1513" />
     <meta name="description" content="WebGPU 기반 실시간 꽃 개화 시뮬레이터. 장미, 튤립, 백합, 벚꽃, 연꽃, 해바라기를 관찰하고 나만의 꽃을 설계하세요." />
     <title>Floraxis — WebGPU 개화 시뮬레이터</title>
-    <script type="module" crossorigin src="./assets/index-cQzb0VWK.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/bloom-renderer-DSCQ-k7D.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-CmRRN9AG.css">
+    <script type="module" crossorigin src="./assets/index-XLbF72rQ.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/bloom-renderer-D3iFDeZU.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-CpN2Fjt4.css">
   </head>
   <body>
     <div id="app">
@@ -279,6 +279,18 @@
                   <span>가장자리 물결 <output data-output="waviness">0.04</output></span>
                   <input type="range" min="0" max="0.3" step="0.005" data-path="waviness" />
                 </label>
+                <div class="surface-controls" aria-label="파라메트릭 꽃잎 표면">
+                  <span class="render-subtitle">BEZIER · NURBS PETAL SURFACE</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>어깨 너비 <output data-surface-output="shoulderWidth">1.08</output></span><input type="range" min="0.18" max="1.5" step="0.01" data-surface="shoulderWidth" /></label>
+                    <label class="range-field"><span>중륵 아치 <output data-surface-output="midribArch">0.09</output></span><input type="range" min="-0.3" max="0.55" step="0.01" data-surface="midribArch" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>횡방향 컵 <output data-surface-output="lateralCup">0.32</output></span><input type="range" min="-0.3" max="0.7" step="0.01" data-surface="lateralCup" /></label>
+                    <label class="range-field"><span>좌우 비대칭 <output data-surface-output="asymmetry">0.08</output></span><input type="range" min="-0.4" max="0.4" step="0.01" data-surface="asymmetry" /></label>
+                  </div>
+                  <label class="range-field"><span>NURBS 가중치 <output data-surface-output="rationalWeight">1.18</output></span><input type="range" min="0.55" max="2" step="0.01" data-surface="rationalWeight" /></label>
+                </div>
                 <label class="range-field">
                   <span>층별 개화 지연 <output data-output="stagger">0.42</output></span>
                   <input type="range" min="0" max="0.65" step="0.01" data-path="stagger" />
@@ -452,11 +464,17 @@
             <div class="mechanism-card"><span>개화 메커니즘</span><p id="research-mechanism"></p></div>
             <div><h3>형태학적 구조</h3><ul id="research-structure"></ul></div>
             <div>
+              <h3>eFLOWER 형질 → 꽃 기관 그래프</h3>
+              <div id="research-traits" class="growth-grid"></div>
+              <ol id="research-organ-graph" class="organ-graph"></ol>
+            </div>
+            <div>
               <h3>관찰 자료 → 정규화 성장 계수</h3>
               <div id="research-growth" class="growth-grid"></div>
               <ul id="research-evidence" class="evidence-list"></ul>
               <p id="research-mapping" class="mapping-note"></p>
             </div>
+            <div><h3>Helios · OpenAlea식 기관별 개화 스케줄</h3><div id="research-phenology" class="phenology-list"></div></div>
             <div><h3>참고한 학술·형태 자료</h3><div id="research-sources" class="source-list"></div></div>
             <p class="research-note">백분율은 논문의 원시 계측값 자체가 아니라, 관찰된 상대 변화와 메커니즘을 화면 크기에 맞게 정규화한 시뮬레이션 계수입니다. 이 앱은 분자·세포 수준의 생장 전체를 계산하는 생물역학 해석기가 아닙니다.</p>
           </div>
@@ -464,6 +482,6 @@
       </dialog>
 
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
-    </div>
+    </div>
   </body>
 </html>
