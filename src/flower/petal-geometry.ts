@@ -2,7 +2,14 @@ import * as THREE from 'three/webgpu';
 import { color, float } from 'three/tsl';
 import { DEFAULT_GROWTH_PROFILE } from '../growth-model';
 import { resolveNaturalSurfaceOptics } from '../render/physical-lighting';
-import type { BloomGrowthProfile, FlowerColors, FlowerMorphology, PetalShape } from '../types';
+import type {
+  BloomGrowthProfile,
+  FlowerColors,
+  FlowerMorphology,
+  ParametricPetalSurfaceProfile,
+  PetalShape,
+} from '../types';
+import { createPetalControlNet, evaluateRationalBezierSurface } from './parametric-petal-surface';
 
 type PetalGrowthGeometry = Pick<
   BloomGrowthProfile,
@@ -22,6 +29,8 @@ export interface PetalGeometryOptions {
   seed: number;
   thickness?: number;
   growth?: PetalGrowthGeometry;
+  /** Species-specific rational bicubic Bezier control profile. */
+  surface?: ParametricPetalSurfaceProfile;
   unfurl?: PetalUnfurlGeometryOptions;
   /** Optional reduced tessellation for distant instanced flower-field petals. */
   segments?: { width: number; length: number };
@@ -46,6 +55,18 @@ export interface PetalUnfurlGeometryOptions {
 }
 
 type PetalPose = 'closed' | 'released' | 'unfurled' | 'open';
+
+const DEFAULT_PETAL_SURFACE: ParametricPetalSurfaceProfile = {
+  baseWidth: 0.08,
+  midWidth: 0.82,
+  shoulderWidth: 1,
+  tipWidth: 0.54,
+  shoulderPosition: 0.72,
+  midribArch: 0.1,
+  lateralCup: 0.18,
+  asymmetry: 0,
+  rationalWeight: 1,
+};
 
 const widthProfile = (v: number, shape: PetalShape, taper: number): number => {
   const base = THREE.MathUtils.smoothstep(v, 0, 0.18);
@@ -77,6 +98,8 @@ const buildPositions = (
   sideCoilStrength = 0,
 ): Float32Array => {
   const positions = new Float32Array((widthSegments + 1) * (lengthSegments + 1) * 3);
+  const surfaceProfile = options.surface ?? DEFAULT_PETAL_SURFACE;
+  const controlNet = createPetalControlNet(surfaceProfile, options.shape);
   const phase = options.seed * 1.61803398875;
   const growthProfile = options.growth ?? DEFAULT_GROWTH_PROFILE;
   const advanced = options.unfurl;
@@ -106,6 +129,10 @@ const buildPositions = (
     const v = iy / lengthSegments;
     for (let ix = 0; ix <= widthSegments; ix += 1) {
       const u = ix / widthSegments * 2 - 1;
+      const surfacePoint = evaluateRationalBezierSurface(controlNet, (u + 1) * 0.5, v);
+      const leftEdge = evaluateRationalBezierSurface(controlNet, 0, v);
+      const rightEdge = evaluateRationalBezierSurface(controlNet, 1, v);
+      const surfaceHalfWidth = Math.max(Math.abs(leftEdge.x), Math.abs(rightEdge.x));
       const profile = widthProfile(v, options.shape, options.taper);
       const closedWidth = THREE.MathUtils.lerp(
         growthProfile.closedPetalWidth,
@@ -113,7 +140,8 @@ const buildPositions = (
         v,
       );
       const expansion = THREE.MathUtils.lerp(closedWidth, 1, widthProgress);
-      let x = u * options.width * 0.5 * profile * expansion;
+      const analyticWidthGain = THREE.MathUtils.lerp(0.82, 1.08, profile);
+      let x = surfacePoint.x * options.width * expansion * analyticWidthGain;
       const tipMask = THREE.MathUtils.smoothstep(v, 0.72, 1);
       const notch = options.notch * options.length * Math.exp(-u * u * 16) * tipMask;
       const roundedShape = options.shape === 'round' || options.shape === 'spoon' || options.shape === 'notched';
@@ -148,13 +176,14 @@ const buildPositions = (
       const closedFold = -Math.pow(v, 2.3) * options.length * (0.16 + Math.max(0, options.curl) * 0.1);
       const basalBand = Math.exp(-Math.pow((v - 0.16) / 0.14, 2)) * (1 - u * u);
       const basalBulge = growthProfile.basalEpinasty * options.length * 0.058 * basalBand;
-      let y = options.length * v * axialGrowth - notch - roundedCap;
+      let y = options.length * surfacePoint.y * axialGrowth - notch - roundedCap;
+      const rationalSurface = surfacePoint.z * options.length * THREE.MathUtils.lerp(0.28, 1, widthProgress);
       let z: number;
 
       if (!advanced) {
         z = open
-          ? transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge
-          : closedFold + transverseCup * 0.42 + longitudinalFold + wave;
+          ? rationalSurface + transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge
+          : rationalSurface * 0.36 + closedFold + transverseCup * 0.42 + longitudinalFold + wave;
       } else {
         const layer = THREE.MathUtils.clamp(advanced.layer, 0, 1);
         const budCurl = THREE.MathUtils.clamp(advanced.budCurl, 0, 1.4);
@@ -172,16 +201,18 @@ const buildPositions = (
         y -= budCurl * options.length * Math.pow(v, 3.05) * 0.08 * coilRetention;
 
         if (pose === 'closed') {
-          z = budCoil + transverseCup * 0.3 + longitudinalFold + wave * 0.25;
+          z = rationalSurface * 0.3 + budCoil + transverseCup * 0.3 + longitudinalFold + wave * 0.25;
         } else if (pose === 'released') {
-          z = budCoil * coilRetention
+          z = rationalSurface * 0.48
+            + budCoil * coilRetention
             + transverseCup * 0.5
             + longitudinalFold
             + wave * 0.45
             + midrib * 0.25
             + basalBulge * 0.9;
         } else if (pose === 'unfurled') {
-          z = budCoil * coilRetention
+          z = rationalSurface * 0.82
+            + budCoil * coilRetention
             + transverseCup * 0.82
             + longitudinalFold
             + tipCurl * 0.35
@@ -190,7 +221,7 @@ const buildPositions = (
             + basalBulge;
         } else {
           const residualCoil = -options.length * innerRetention * distalMask * 0.26;
-          z = transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge + residualCoil;
+          z = rationalSurface + transverseCup + longitudinalFold + tipCurl + wave + midrib + basalBulge + residualCoil;
         }
       }
 
@@ -200,7 +231,7 @@ const buildPositions = (
         const counterCurve = THREE.MathUtils.clamp(advanced.sideCoilCounterCurve ?? 0.18, 0.08, 0.62);
         const curvatureGain = THREE.MathUtils.lerp(counterCurve, 1, activeSide);
         const longitudinal = Math.pow(THREE.MathUtils.smoothstep(v, 0.1, 0.9), 0.82);
-        const halfWidth = options.width * 0.5 * profile * expansion;
+        const halfWidth = options.width * surfaceHalfWidth * expansion * analyticWidthGain;
         const axisX = direction * halfWidth * 0.045;
         const offsetX = x - axisX;
         const rollAngle = THREE.MathUtils.clamp(sideCoilStrength, 0, 1.25)
@@ -396,6 +427,8 @@ export const createPetalGeometry = (options: PetalGeometryOptions): THREE.Buffer
   geometry.userData.closedPetalLength = options.growth?.closedPetalLength ?? DEFAULT_GROWTH_PROFILE.closedPetalLength;
   geometry.userData.closedPetalWidth = options.growth?.closedPetalWidth ?? DEFAULT_GROWTH_PROFILE.closedPetalWidth;
   geometry.userData.petalFold = options.fold ?? 0;
+  geometry.userData.surfaceModel = 'rational-bicubic-bezier';
+  geometry.userData.surfaceProfile = { ...(options.surface ?? DEFAULT_PETAL_SURFACE) };
   const centreCoilMorphOffset = centreCoilTargets.length > 0 ? targetPoses.length : -1;
   geometry.userData.petalMorphStages = [
     ...targetPoses,

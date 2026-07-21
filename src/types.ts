@@ -2,6 +2,61 @@ export type FlowerKind = 'radial' | 'sunflower' | 'hydrangea' | 'wisteria';
 
 export type PetalShape = 'round' | 'pointed' | 'lance' | 'notched' | 'spoon';
 
+export type FloralSymmetry = 'actinomorphic' | 'zygomorphic';
+export type FloralPhyllotaxis = 'whorled' | 'spiral' | 'clustered';
+export type FloralFusion = 'free' | 'basally-fused' | 'fused';
+export type PerianthDifferentiation = 'sepals-petals' | 'tepals' | 'reduced';
+
+/**
+ * Renderable subset of the eFLOWER trait vocabulary. The original database is
+ * categorical; counts here retain the selected preset's representative values.
+ */
+export interface EFlowerTraitProfile {
+  sex: 'bisexual' | 'staminate' | 'pistillate' | 'sterile';
+  symmetry: FloralSymmetry;
+  ovaryPosition: 'superior' | 'inferior' | 'embedded';
+  perianth: {
+    differentiation: PerianthDifferentiation;
+    phyllotaxis: FloralPhyllotaxis;
+    whorls: number;
+    merism: number;
+    fusion: FloralFusion;
+  };
+  androecium: {
+    phyllotaxis: FloralPhyllotaxis;
+    whorls: number;
+    merism: number;
+    count: number;
+    filamentFusion: FloralFusion;
+    antherOrientation: 'introrse' | 'extrorse' | 'latrorse';
+  };
+  gynoecium: {
+    phyllotaxis: FloralPhyllotaxis;
+    carpelCount: number;
+    ovaryFusion: FloralFusion;
+    ovulesPerCarpel: number;
+  };
+}
+
+/** Control parameters for a rational bicubic Bezier (single-span NURBS) petal. */
+export interface ParametricPetalSurfaceProfile {
+  baseWidth: number;
+  midWidth: number;
+  shoulderWidth: number;
+  tipWidth: number;
+  shoulderPosition: number;
+  midribArch: number;
+  lateralCup: number;
+  asymmetry: number;
+  rationalWeight: number;
+}
+
+export interface FloralSystemProfile {
+  schemaVersion: 1;
+  traits: EFlowerTraitProfile;
+  petalSurface: ParametricPetalSurfaceProfile;
+}
+
 export interface FlowerColors {
   base: string;
   tip: string;
@@ -144,6 +199,8 @@ export interface FlowerPreset {
   growth?: BloomGrowthProfile;
   /** Optional for backward compatibility with previously exported custom presets. */
   architecture?: BotanicalArchitecture;
+  /** Optional for backward compatibility; normalized when a preset is loaded. */
+  floralSystem?: FloralSystemProfile;
   sources: ResearchSource[];
 }
 

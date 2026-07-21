@@ -1,5 +1,6 @@
 import './style.css';
 import { DEFAULT_PRESET, PRESETS } from './data/presets';
+import { resolveFloralSystemProfile } from './data/floral-system-profiles';
 import {
   HEAD_FACING_LABEL,
   LEAF_SHAPE_LABEL,
@@ -14,6 +15,8 @@ import {
   type FieldPlant,
 } from './flower/flower-field-layout';
 import { resolveGrowthProfile } from './growth-model';
+import { buildFloralOrganGraph } from './flower/floral-organ-graph';
+import { resolveOrganGrowthSchedule } from './flower/organ-growth';
 import { BloomRenderer, type RendererFrameInfo } from './render/bloom-renderer';
 import type {
   AppState,
@@ -22,6 +25,7 @@ import type {
   FieldSettings,
   FlowerPreset,
   IndividualFlowerSettings,
+  ParametricPetalSurfaceProfile,
   RenderSettings,
   SceneMode,
 } from './types';
@@ -81,6 +85,13 @@ const DEFAULT_SPECIES_VARIATIONS = Object.fromEntries(PRESETS.map((preset) => [p
   height: 0.35,
   flowerSize: 0.35,
 }]));
+
+const SYSTEM_RESEARCH_SOURCES = [
+  { label: 'Nature Communications · eFLOWER 792종 21개 꽃 형질', url: 'https://www.nature.com/articles/ncomms16047' },
+  { label: 'Open Traits · eFLOWER 형질 사전과 CC BY 4.0 데이터', url: 'https://opentraits.org/datasets/e-flower' },
+  { label: 'Helios · 동적 식물 구조와 기관별 성장 파라미터', url: 'https://plantsimulationlab.github.io/Helios/_plant_architecture_doc.html' },
+  { label: 'OpenAlea · MTG·L-Py·PlantGL 모델링 체계', url: 'https://openalea.readthedocs.io/en/latest/packages/modelling.html' },
+];
 
 const DEFAULT_FIELD: FieldSettings = {
   count: 120,
@@ -492,6 +503,14 @@ const updateMorphologyUI = (): void => {
     const unit = input.dataset.unit ?? '';
     output.value = `${Number.isInteger(Number(input.step)) ? Math.round(value) : Number(value.toFixed(3))}${unit}`;
   });
+  const floralSystem = resolveFloralSystemProfile(state.preset);
+  qsa<HTMLInputElement>('[data-surface]').forEach((input) => {
+    const key = input.dataset.surface as keyof ParametricPetalSurfaceProfile;
+    const value = floralSystem.petalSurface[key];
+    input.value = String(value);
+    updateRangeVisual(input);
+    qs<HTMLOutputElement>(`[data-surface-output="${key}"]`).value = Number(value.toFixed(2)).toString();
+  });
   const growth = resolveGrowthProfile(state.preset);
   qsa<HTMLInputElement>('[data-growth]').forEach((input) => {
     const key = input.dataset.growth as keyof BloomGrowthProfile;
@@ -513,12 +532,55 @@ const updateMorphologyUI = (): void => {
 const updateResearchUI = (): void => {
   const growth = resolveGrowthProfile(state.preset);
   const architecture = resolveBotanicalArchitecture(state.preset);
+  const floralSystem = resolveFloralSystemProfile(state.preset);
+  const organGraph = buildFloralOrganGraph(state.preset);
+  const phenology = resolveOrganGrowthSchedule(state.preset, organGraph);
+  const traits = floralSystem.traits;
   qs<HTMLElement>('#research-title').textContent = `${state.preset.name} · 개화 연구 노트`;
   qs<HTMLElement>('#research-mechanism').textContent = state.preset.bloomMechanism;
   qs<HTMLElement>('#research-structure').replaceChildren(...state.preset.structure.map((item) => {
     const li = document.createElement('li');
     li.textContent = item;
     return li;
+  }));
+  const traitMetrics = [
+    ['대칭', traits.symmetry === 'actinomorphic' ? '방사대칭' : '좌우대칭'],
+    ['화피', `${traits.perianth.differentiation === 'tepals' ? '화피동형' : traits.perianth.differentiation === 'reduced' ? '축소 화피' : '꽃받침·꽃잎 분화'} · ${traits.perianth.phyllotaxis === 'whorled' ? '윤생' : traits.perianth.phyllotaxis === 'spiral' ? '나선' : '꽃차례 군집'}`],
+    ['화피 단위', `${traits.perianth.whorls}윤 · ${traits.perianth.merism}수성 · ${traits.perianth.fusion === 'free' ? '이생' : '합생'}`],
+    ['수술', `${traits.androecium.count}개 · ${traits.androecium.phyllotaxis === 'whorled' ? '윤생' : traits.androecium.phyllotaxis === 'spiral' ? '나선' : '군집'}`],
+    ['심피', `${traits.gynoecium.carpelCount}개 · ${traits.gynoecium.ovaryFusion === 'free' ? '이생' : '합생'}`],
+    ['자방 위치', traits.ovaryPosition === 'superior' ? '상위' : traits.ovaryPosition === 'inferior' ? '하위' : '화탁 매입'],
+    ['꽃잎 표면', '유리 3차 베지어 · 단일 NURBS 패치'],
+    ['NURBS 가중치', floralSystem.petalSurface.rationalWeight.toFixed(2)],
+  ];
+  qs<HTMLElement>('#research-traits').replaceChildren(...traitMetrics.map(([label, value]) => {
+    const item = document.createElement('div');
+    const title = document.createElement('span');
+    const output = document.createElement('strong');
+    title.textContent = label;
+    output.textContent = value;
+    item.append(title, output);
+    return item;
+  }));
+  const graphById = new Map(organGraph.nodes.map((organ) => [organ.id, organ]));
+  const nodeDepth = (id: string): number => {
+    let depth = 0;
+    let current = graphById.get(id);
+    while (current?.parentId && depth < 4) {
+      depth += 1;
+      current = graphById.get(current.parentId);
+    }
+    return depth;
+  };
+  qs<HTMLOListElement>('#research-organ-graph').replaceChildren(...organGraph.nodes.map((organ) => {
+    const item = document.createElement('li');
+    const scope = organ.scope === 'per-floret' ? '소화당' : organ.scope === 'head' ? '꽃머리 전체' : '한 꽃';
+    item.style.marginLeft = `${nodeDepth(organ.id) * 10}px`;
+    item.textContent = `${organ.label} × ${organ.count}`;
+    const detail = document.createElement('small');
+    detail.textContent = `${scope} · ${organ.arrangement === 'whorled' ? '윤생' : organ.arrangement === 'spiral' ? '나선' : '군집'} · ${organ.fusion === 'free' ? '이생' : '연결/합생'}`;
+    item.append(detail);
+    return item;
   }));
   const growthMetrics = [
     ['꽃봉오리 머리', `${Math.round(growth.budHeadScale * 100)} → 100%`],
@@ -547,8 +609,25 @@ const updateResearchUI = (): void => {
     li.textContent = observation;
     return li;
   }));
-  qs<HTMLElement>('#research-mapping').textContent = growth.mappingNote;
-  qs<HTMLElement>('#research-sources').replaceChildren(...state.preset.sources.map((source) => {
+  qs<HTMLElement>('#research-mapping').textContent = `${growth.mappingNote} 기관 관계는 eFLOWER식 형질에서 그래프로 만들고, 각 기관 표면과 생장 법칙은 독립적으로 평가합니다.`;
+  qs<HTMLElement>('#research-phenology').replaceChildren(...phenology
+    .filter((entry) => (graphById.get(entry.nodeId)?.count ?? 0) > 0)
+    .map((entry) => {
+      const item = document.createElement('div');
+      const label = document.createElement('span');
+      const bar = document.createElement('i');
+      const range = document.createElement('output');
+      const end = clamp01(entry.start + entry.span + entry.rankDelay);
+      label.textContent = entry.label;
+      bar.style.setProperty('--start', `${Math.round(entry.start * 100)}%`);
+      bar.style.setProperty('--end', `${Math.round(end * 100)}%`);
+      range.textContent = `${Math.round(entry.start * 100)}–${Math.round(end * 100)}%`;
+      item.append(label, bar, range);
+      return item;
+    }));
+  const sources = [...state.preset.sources, ...SYSTEM_RESEARCH_SOURCES]
+    .filter((source, index, all) => all.findIndex((item) => item.url === source.url) === index);
+  qs<HTMLElement>('#research-sources').replaceChildren(...sources.map((source) => {
     const link = document.createElement('a');
     link.href = source.url;
     link.target = '_blank';
@@ -741,6 +820,13 @@ const randomizeCustom = (): void => {
     m.fold += (Math.random() - 0.5) * 0.34;
     m.twist += (Math.random() - 0.5) * 14;
     m.waviness += Math.random() * 0.065;
+    preset.floralSystem ??= resolveFloralSystemProfile(preset);
+    const surface = preset.floralSystem.petalSurface;
+    surface.shoulderWidth += (Math.random() - 0.5) * 0.24;
+    surface.midribArch += (Math.random() - 0.5) * 0.12;
+    surface.lateralCup += (Math.random() - 0.5) * 0.18;
+    surface.asymmetry += (Math.random() - 0.5) * 0.16;
+    surface.rationalWeight += (Math.random() - 0.5) * 0.24;
     const sourceColor = preset.colors.base.slice(1);
     const rgb = Number.parseInt(sourceColor, 16);
     const r = (rgb >> 16) & 255;
@@ -983,6 +1069,16 @@ const wireEvents = (): void => {
         preset.growth ??= { ...inherited, observations: [...inherited.observations] };
         (preset.growth as unknown as Record<string, number>)[key] = Number(input.value);
         preset.growth.mappingNote = '기준 종의 연구 프로파일을 사용자가 조정한 정규화 계수입니다.';
+      });
+    });
+  });
+
+  qsa<HTMLInputElement>('[data-surface]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const key = input.dataset.surface as keyof ParametricPetalSurfaceProfile;
+      applyCustomChange((preset) => {
+        preset.floralSystem ??= resolveFloralSystemProfile(preset);
+        preset.floralSystem.petalSurface[key] = Number(input.value);
       });
     });
   });

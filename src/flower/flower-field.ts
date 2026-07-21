@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import type { Bloomable, BloomGrowthProfile, FieldSettings, FlowerPreset } from '../types';
 import { resolveBotanicalArchitecture } from '../data/botanical-architecture';
+import { resolveFloralSystemProfile } from '../data/floral-system-profiles';
 import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } from '../growth-model';
 import { resolveNaturalSurfaceOptics } from '../render/physical-lighting';
 import { remapBloom, smoothstep } from '../utils';
@@ -29,6 +30,8 @@ import {
   type FieldLod,
   type FieldPlant,
 } from './flower-field-layout';
+import { buildFloralOrganGraph, findOrganNode, generateOrganPlacements } from './floral-organ-graph';
+import { findOrganGrowth, resolveOrganGrowthSchedule } from './organ-growth';
 
 interface FieldRoseVortexSpec {
   phase: number;
@@ -157,13 +160,6 @@ const deployedHeadDiameter = (preset: FlowerPreset): number => {
   if (preset.kind === 'hydrangea') return 1.42;
   if (preset.kind === 'wisteria') return 1.36;
   return Math.max(0.2, (m.headRadius + m.petalLength * (preset.kind === 'sunflower' ? 0.96 : 0.9)) * 2);
-};
-
-const distributePetals = (total: number, layers: number): number[] => {
-  const safeLayers = Math.max(1, Math.min(total, layers));
-  const counts = Array.from({ length: safeLayers }, () => Math.floor(total / safeLayers));
-  for (let index = 0; index < total % safeLayers; index += 1) counts[index] += 1;
-  return counts;
 };
 
 const makeMorphTargetsRelative = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => {
@@ -320,58 +316,70 @@ export class FlowerField implements Bloomable {
         inflorescence,
       }));
     }
-    const layerCounts = distributePetals(count, m.layers);
+    const graph = buildFloralOrganGraph(preset);
+    const perianthNode = preset.kind === 'sunflower'
+      ? findOrganNode(graph, 'ray-floret')
+      : findOrganNode(graph, 'petal', 'tepal');
+    if (!perianthNode) return [];
+    const placements = generateOrganPlacements(perianthNode, {
+      count,
+      layers: preset.kind === 'sunflower' ? 1 : m.layers,
+      spiralBias: (0.55 + m.spiral) * GOLDEN_ANGLE,
+    });
+    const schedule = resolveOrganGrowthSchedule(preset, graph);
+    const perianthGrowth = findOrganGrowth(schedule, perianthNode.id);
     const specs: FieldPetalSpec[] = [];
     const usesUnfurl = m.budCurl > 0.01;
     const usesVortex = usesRoseVortex(preset);
 
-    for (let layer = 0; layer < layerCounts.length; layer += 1) {
-      const layerCount = layerCounts[layer];
-      const inner = layer / Math.max(1, layerCounts.length - 1);
+    const layerTotal = Math.max(1, ...placements.map((placement) => placement.layer + 1));
+    for (const organPlacement of placements) {
+      const layer = organPlacement.layer;
+      const layerCount = organPlacement.layerCount;
+      const index = organPlacement.indexInLayer;
+      const inner = organPlacement.normalizedLayer;
       const petalWidth = m.petalWidth * (1 - inner * m.layerScale * 0.62);
       const petalLength = m.petalLength * (1 - inner * m.layerScale);
       const thickness = resolvePetalThickness(petalLength);
-      for (let index = 0; index < layerCount; index += 1) {
-        const clearance = computePetalClearance({
-          width: petalWidth,
-          count: layerCount,
-          index,
-          layer,
-          layers: layerCounts.length,
-          headRadius: m.headRadius,
-          thickness,
-        });
-        const layerDelay = inner * m.stagger * (usesUnfurl ? 0.92 : 0.72);
-        const individualDelay = (index % 3) * 0.006 + Math.sin(index * 11.7) * 0.008;
-        const innerClosure = usesUnfurl
-          ? THREE.MathUtils.lerp(0.28, 0.7, m.innerCoil)
-          : preset.id === 'lotus' ? 0.26 : 0.13;
-        specs.push({
-          angle: index / layerCount * Math.PI * 2 + layer * (0.55 + m.spiral) * GOLDEN_ANGLE,
-          layer: inner,
-          delay: Math.max(0, growth.openingStart + layerDelay + individualDelay),
-          span: Math.max(0.18, growth.openingSpan - layerDelay * 0.72),
-          openAngle: m.openAngle * (1 - inner * innerClosure),
-          closedAngle: m.closedAngle + inner * 2,
-          closedRoll: clearance.weaveYaw,
-          roll: Math.sin(index * 8.13 + layer) * m.twist * DEG + clearance.weaveYaw,
-          sweep: Math.sin(index * 2.41 + layer) * m.twist * 0.2 * DEG,
-          phase: index * 0.73 + layer,
-          radialBase: preset.kind === 'sunflower'
-            ? Math.max(m.headRadius * 0.88, clearance.radialBase)
-            : clearance.radialBase,
-          baseLift: preset.kind === 'sunflower' ? 0.1 : clearance.layerLift,
-          laneDepth: clearance.laneDepth,
-          laneLift: clearance.laneLift,
-          openDrift: clearance.openDrift * (preset.kind === 'sunflower' ? 0.55 : 1),
-          contactGuard: thickness * 1.8 + petalWidth * 0.01,
-          vortex: usesVortex ? {
-            phase: index / layerCount,
-            strength: m.innerCoil,
-            centreCoilMorphOffset: 3,
-          } : undefined,
-        });
-      }
+      const clearance = computePetalClearance({
+        width: petalWidth,
+        count: layerCount,
+        index,
+        layer,
+        layers: layerTotal,
+        headRadius: m.headRadius,
+        thickness,
+      });
+      const layerDelay = inner * perianthGrowth.rankDelay;
+      const individualDelay = (index % 3) * 0.006 + Math.sin(index * 11.7) * 0.008;
+      const innerClosure = usesUnfurl
+        ? THREE.MathUtils.lerp(0.28, 0.7, m.innerCoil)
+        : preset.id === 'lotus' ? 0.26 : 0.13;
+      specs.push({
+        angle: organPlacement.angle,
+        layer: inner,
+        delay: Math.max(0, perianthGrowth.start + layerDelay + individualDelay),
+        span: Math.max(0.18, perianthGrowth.span - layerDelay * 0.72),
+        openAngle: m.openAngle * (1 - inner * innerClosure),
+        closedAngle: m.closedAngle + inner * 2,
+        closedRoll: clearance.weaveYaw,
+        roll: Math.sin(index * 8.13 + layer) * m.twist * DEG + clearance.weaveYaw,
+        sweep: Math.sin(index * 2.41 + layer) * m.twist * 0.2 * DEG,
+        phase: organPlacement.index * 0.73 + layer,
+        radialBase: preset.kind === 'sunflower'
+          ? Math.max(m.headRadius * 0.88, clearance.radialBase)
+          : clearance.radialBase,
+        baseLift: preset.kind === 'sunflower' ? 0.1 : clearance.layerLift,
+        laneDepth: clearance.laneDepth,
+        laneLift: clearance.laneLift,
+        openDrift: clearance.openDrift * (preset.kind === 'sunflower' ? 0.55 : 1),
+        contactGuard: thickness * 1.8 + petalWidth * 0.01,
+        vortex: usesVortex ? {
+          phase: organPlacement.rank,
+          strength: m.innerCoil,
+          centreCoilMorphOffset: 3,
+        } : undefined,
+      });
     }
     return specs;
   }
@@ -391,18 +399,22 @@ export class FlowerField implements Bloomable {
       sunflower: preset.kind === 'sunflower',
     });
     const count = Math.min(m.sepalCount, preset.kind === 'sunflower' ? 10 : 6);
+    const graph = buildFloralOrganGraph(preset);
+    const sepalNode = findOrganNode(graph, 'sepal');
+    if (!sepalNode) return [];
+    const sepalPlacements = generateOrganPlacements(sepalNode, { count, layers: 1 });
+    const sepalGrowth = findOrganGrowth(resolveOrganGrowthSchedule(preset, graph), sepalNode.id);
     const openAngle = preset.kind === 'sunflower' ? 138 : preset.id === 'lotus' ? 118 : 128;
-    const delay = Math.max(0.015, growth.openingStart - (preset.kind === 'sunflower' ? 0.08 : 0.1));
-    const span = Math.min(0.62, Math.max(0.3, growth.openingSpan * (preset.kind === 'sunflower' ? 0.9 : 0.72)));
-    return Array.from({ length: count }, (_, index) => ({
-      angle: index / count * Math.PI * 2 + GOLDEN_ANGLE * 0.2,
-      delay,
+    const span = Math.min(0.62, sepalGrowth.span * (preset.kind === 'sunflower' ? 1.12 : 1));
+    return sepalPlacements.map((organPlacement) => ({
+      angle: organPlacement.angle + GOLDEN_ANGLE * 0.2,
+      delay: sepalGrowth.start,
       span,
       openAngle,
       closedAngle: placement.sepalClosedAngleDeg,
-      closedRoll: (index % 2 === 0 ? -1 : 1) * 1.5 * DEG,
-      roll: (index % 2 === 0 ? -1 : 1) * (preset.kind === 'sunflower' ? 5 : 3) * DEG,
-      sweep: Math.sin(index * 1.93) * (preset.kind === 'sunflower' ? 4 : 2.5) * DEG,
+      closedRoll: (organPlacement.index % 2 === 0 ? -1 : 1) * 1.5 * DEG,
+      roll: (organPlacement.index % 2 === 0 ? -1 : 1) * (preset.kind === 'sunflower' ? 5 : 3) * DEG,
+      sweep: Math.sin(organPlacement.index * 1.93) * (preset.kind === 'sunflower' ? 4 : 2.5) * DEG,
       radialBase: placement.sepalRadius,
       baseLift: placement.sepalBaseLift,
       openDrift: placement.sepalOpenDrift,
@@ -413,6 +425,7 @@ export class FlowerField implements Bloomable {
   private buildSpeciesBatch(preset: FlowerPreset, plants: FieldPlant[]): SpeciesBatch {
     const m = preset.morphology;
     const growth = resolveGrowthProfile(preset);
+    const floralSystem = resolveFloralSystemProfile(preset);
     const architecture = resolveBotanicalArchitecture(preset);
     const petalInstances: FieldPetalInstance[] = [];
     const specCache = new Map<FieldLod, FieldPetalSpec[]>();
@@ -490,6 +503,7 @@ export class FlowerField implements Bloomable {
       seed: preset.id.length * 17,
       thickness: resolvePetalThickness(m.petalLength),
       growth,
+      surface: floralSystem.petalSurface,
       unfurl: usesUnfurl ? {
         budCurl: m.budCurl,
         wave: m.unfurl,
@@ -532,6 +546,15 @@ export class FlowerField implements Bloomable {
         fold: 0.28,
         seed: 117,
         growth: { closedPetalLength: 0.96, closedPetalWidth: 0.82, basalEpinasty: 0.08, marginGrowth: 0.06 },
+        surface: {
+          ...floralSystem.petalSurface,
+          baseWidth: 0.08,
+          midWidth: 0.56,
+          shoulderWidth: 0.64,
+          tipWidth: 0.05,
+          shoulderPosition: 0.58,
+          lateralCup: 0.12,
+        },
         segments: { width: 4, length: 7 },
         colors: sepalColors,
       })));

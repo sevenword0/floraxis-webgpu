@@ -1,4 +1,5 @@
 import type { FlowerMorphology, FlowerPreset } from '../types';
+import { FLORAL_SYSTEM_PROFILES } from './floral-system-profiles';
 
 const baseMorphology: FlowerMorphology = {
   petalCount: 18,
@@ -48,6 +49,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '장미의 꽃잎 움직임은 꽃잎 기부 양면의 비대칭 성장으로 구동됩니다. 후기에는 세포 분열보다 세포 팽창이 형태 변화를 주도합니다.',
     structure: ['4층 · 42개 꽃잎', '바깥층 우선 개방', '기부 비대칭 성장', '다수 수술'],
     kind: 'radial',
+    floralSystem: FLORAL_SYSTEM_PROFILES.rose,
     architecture: {
       heightReference: 'root-zone',
       heightRangeCm: [150, 250],
@@ -106,6 +108,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '튤립의 개폐는 화피 내측과 외측 조직의 온도 최적점 차이에서 생기는 성장률 차이와 연결됩니다.',
     structure: ['2윤생 · 6개 화피', '3+3 방사 대칭', '온도 감응 개폐', '6개 수술'],
     kind: 'radial',
+    floralSystem: FLORAL_SYSTEM_PROFILES.tulip,
     architecture: {
       heightReference: 'root-zone',
       heightRangeCm: [10, 50],
@@ -164,6 +167,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '백합은 화피 가장자리와 단단한 중륵 사이의 차등 성장으로 펼쳐집니다. 성장 불일치가 개방과 가장자리 물결을 함께 만듭니다.',
     structure: ['2윤생 · 6개 화피', '강한 중륵', '끝단 후굴', '긴 6개 수술'],
     kind: 'radial',
+    floralSystem: FLORAL_SYSTEM_PROFILES.lily,
     architecture: {
       heightReference: 'root-zone',
       heightRangeCm: [90, 150],
@@ -223,6 +227,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '겹쳐 접힌 5수성 꽃잎이 꽃받침에서 분리된 뒤 빠르게 각도를 넓혀 다수 수술을 노출합니다.',
     structure: ['5개 꽃잎 · 5개 꽃받침', '끝단 오목 형태', '컵 모양 화탁', '15–80개 수술'],
     kind: 'radial',
+    floralSystem: FLORAL_SYSTEM_PROFILES.sakura,
     architecture: {
       heightReference: 'root-zone',
       heightRangeCm: [914, 1219],
@@ -281,6 +286,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '바깥 화피가 먼저 이완되고 안쪽 화피가 단계적으로 따라 열리며, 나선 기관 배열이 깊은 그릇 형태를 만듭니다.',
     structure: ['3층 · 24개 화피', '나선형 기관 배치', '다수 수술', '확대된 원뿔형 화탁'],
     kind: 'radial',
+    floralSystem: FLORAL_SYSTEM_PROFILES.lotus,
     architecture: {
       heightReference: 'water-surface',
       heightRangeCm: [91, 183],
@@ -341,6 +347,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '바깥 설상화가 먼저 펴지고, 중앙 통상화는 황금각 나선을 따라 바깥쪽 고리에서 안쪽으로 차례로 성숙합니다.',
     structure: ['56개 설상화', '480개 통상화', '황금각 나선', '구심적 개화'],
     kind: 'sunflower',
+    floralSystem: FLORAL_SYSTEM_PROFILES.sunflower,
     architecture: {
       heightReference: 'root-zone',
       heightRangeCm: [91, 305],
@@ -400,6 +407,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '구형 화서분열조직의 1·2차 분지 위에서 소화가 분화하고, 장식화의 꽃받침조각이 펼쳐지며 착색되어 둥근 꽃머리가 팽창합니다.',
     structure: ['한 뿌리 · 5개 기부 꽃대', '꽃대마다 말단 돔형 화서', '소화당 4개 꽃받침조각', '장식화·가임화 혼재'],
     kind: 'hydrangea',
+    floralSystem: FLORAL_SYSTEM_PROFILES.hydrangea,
     architecture: {
       heightReference: 'root-zone',
       heightRangeCm: [100, 150],
@@ -460,6 +468,7 @@ export const PRESETS: FlowerPreset[] = [
     bloomMechanism: '신장하는 무분지 꽃차례축에 꽃자루가 달린 소화가 배열되고, 기부 쪽 소화부터 배너·날개·용골 꽃잎이 순차적으로 전개됩니다.',
     structure: ['18개 나비형 소화', '소화당 5개 꽃잎', '무분지 하수 중심축', '부착부→끝 개화 파동'],
     kind: 'wisteria',
+    floralSystem: FLORAL_SYSTEM_PROFILES.wisteria,
     architecture: {
       heightReference: 'root-zone',
       heightRangeCm: [800, 1200],

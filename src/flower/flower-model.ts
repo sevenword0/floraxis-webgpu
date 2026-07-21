@@ -1,9 +1,10 @@
 import * as THREE from 'three/webgpu';
 import { color, float } from 'three/tsl';
 import { resolveBotanicalArchitecture } from '../data/botanical-architecture';
-import { evaluateHeadGrowth, evaluateReproductiveReveal, resolveGrowthProfile } from '../growth-model';
+import { resolveFloralSystemProfile } from '../data/floral-system-profiles';
+import { evaluateHeadGrowth, resolveGrowthProfile } from '../growth-model';
 import { resolveNaturalSurfaceOptics } from '../render/physical-lighting';
-import type { Bloomable, BloomGrowthProfile, FlowerPreset } from '../types';
+import type { Bloomable, BloomGrowthProfile, FloralSystemProfile, FlowerPreset } from '../types';
 import { remapBloom, seededRandom, smoothstep } from '../utils';
 import { createPetalGeometry, createPetalMaterial, resolvePetalThickness } from './petal-geometry';
 import { computeFloralAttachment, computePetalClearance } from './petal-layout';
@@ -17,6 +18,18 @@ import {
 } from './inflorescence-layout';
 import { displayStemRadius } from './stem-proportions';
 import { resolveBotanicalCurvature } from './botanical-curvature';
+import {
+  buildFloralOrganGraph,
+  findOrganNode,
+  generateOrganPlacements,
+  type FloralOrganGraph,
+} from './floral-organ-graph';
+import {
+  evaluateOrganGrowth,
+  findOrganGrowth,
+  resolveOrganGrowthSchedule,
+  type OrganGrowthScheduleEntry,
+} from './organ-growth';
 
 interface PetalUnfurlMotion {
   layer: number;
@@ -90,6 +103,9 @@ export class FlowerModel implements Bloomable {
 
   private readonly preset: FlowerPreset;
   private readonly growth: BloomGrowthProfile;
+  private readonly floralSystem: FloralSystemProfile;
+  private readonly organGraph: FloralOrganGraph;
+  private readonly organSchedule: OrganGrowthScheduleEntry[];
   private readonly head = new THREE.Group();
   private readonly floralBase = new THREE.Group();
   private readonly attachmentLayout: ReturnType<typeof computeFloralAttachment>;
@@ -113,6 +129,9 @@ export class FlowerModel implements Bloomable {
   constructor(preset: FlowerPreset) {
     this.preset = preset;
     this.growth = resolveGrowthProfile(preset);
+    this.floralSystem = resolveFloralSystemProfile(preset);
+    this.organGraph = buildFloralOrganGraph(preset);
+    this.organSchedule = resolveOrganGrowthSchedule(preset, this.organGraph);
     const architecture = resolveBotanicalArchitecture(preset);
     const curvature = resolveBotanicalCurvature(architecture.stemHabit, architecture.leafShape);
     const curveSeed = [...preset.id].reduce((sum, character, index) => sum + character.charCodeAt(0) * (index + 3), 0);
@@ -146,6 +165,9 @@ export class FlowerModel implements Bloomable {
     });
     this.petalCount = preset.morphology.petalCount + (preset.kind === 'sunflower' ? preset.morphology.discCount : 0);
     this.root.name = `flower-${preset.id}`;
+    this.root.userData.floralOrganGraph = this.organGraph;
+    this.root.userData.organGrowthSchedule = this.organSchedule;
+    this.root.userData.petalSurfaceModel = 'rational-bicubic-bezier';
     this.buildStem();
     this.head.position.set(
       this.stemTip.x + (preset.kind === 'wisteria' ? WISTERIA_HANGER_LENGTH : 0),
@@ -352,12 +374,21 @@ export class FlowerModel implements Bloomable {
   private buildRadialFlower(): void {
     const { morphology: m, colors } = this.preset;
     const material = this.track(createPetalMaterial(colors, m));
-    const layerCounts = this.distributePetals(m.petalCount, m.layers);
+    const perianthNode = findOrganNode(this.organGraph, 'petal', 'tepal');
+    if (!perianthNode) return;
+    const placements = generateOrganPlacements(perianthNode, {
+      count: m.petalCount,
+      layers: m.layers,
+      spiralBias: (0.55 + m.spiral) * GOLDEN_ANGLE,
+    });
+    const perianthGrowth = findOrganGrowth(this.organSchedule, perianthNode.id);
     const usesUnfurl = m.budCurl > 0.01;
     const usesVortex = usesRoseVortex(this.preset);
 
     for (let layer = 0; layer < m.layers; layer += 1) {
-      const count = layerCounts[layer];
+      const layerPlacements = placements.filter((placement) => placement.layer === layer);
+      const count = layerPlacements.length;
+      if (count === 0) continue;
       const inner = layer / Math.max(1, m.layers - 1);
       const scale = 1 - inner * m.layerScale;
       const petalLength = m.petalLength * scale;
@@ -379,6 +410,7 @@ export class FlowerModel implements Bloomable {
         seed: layer + this.preset.id.length,
         thickness: petalThickness,
         growth: petalGrowth,
+        surface: this.floralSystem.petalSurface,
         unfurl: usesUnfurl ? {
           budCurl: m.budCurl * (0.84 + inner * 0.32),
           wave: m.unfurl,
@@ -391,7 +423,8 @@ export class FlowerModel implements Bloomable {
         colors,
       }));
 
-      for (let index = 0; index < count; index += 1) {
+      for (const organPlacement of layerPlacements) {
+        const index = organPlacement.indexInLayer;
         const clearance = computePetalClearance({
           width: petalWidth,
           count,
@@ -401,7 +434,7 @@ export class FlowerModel implements Bloomable {
           headRadius: m.headRadius,
           thickness: petalThickness,
         });
-        const angle = index / count * Math.PI * 2 + layer * (0.55 + m.spiral) * GOLDEN_ANGLE;
+        const angle = organPlacement.angle;
         const radial = new THREE.Group();
         radial.rotation.y = angle;
         const hinge = new THREE.Group();
@@ -415,7 +448,7 @@ export class FlowerModel implements Bloomable {
         mesh.rotation.y = closedRoll;
         hinge.add(mesh);
         this.head.add(radial);
-        const layerDelay = inner * m.stagger * (usesUnfurl ? 0.92 : 0.72);
+        const layerDelay = inner * perianthGrowth.rankDelay;
         const individualDelay = (index % 3) * 0.006 + Math.sin(index * 11.7) * 0.008;
         const innerClosure = usesUnfurl
           ? THREE.MathUtils.lerp(0.28, 0.7, m.innerCoil)
@@ -427,7 +460,7 @@ export class FlowerModel implements Bloomable {
         this.petals.push({
           hinge,
           mesh,
-          delay: Math.max(0, this.growth.openingStart + layerDelay + individualDelay),
+          delay: Math.max(0, perianthGrowth.start + layerDelay + individualDelay),
           openAngle: m.openAngle * (1 - inner * innerClosure),
           closedAngle: m.closedAngle + inner * 2,
           closedRoll,
@@ -435,7 +468,7 @@ export class FlowerModel implements Bloomable {
           sweep: (Math.sin(index * 2.41 + layer) * m.twist * 0.2) * DEG,
           phase: index * 0.73 + layer,
           growth: scale,
-          span: Math.max(0.18, this.growth.openingSpan - layerDelay * 0.72),
+          span: Math.max(0.18, perianthGrowth.span - layerDelay * 0.72),
           unfurl: usesUnfurl ? {
             layer: inner,
             wave: m.unfurl,
@@ -443,7 +476,7 @@ export class FlowerModel implements Bloomable {
           } : undefined,
           vortex: usesVortex ? {
             layer: inner,
-            phase: index / count,
+            phase: organPlacement.rank,
             strength: m.innerCoil,
             centreCoilMorphOffset: Number(geometry.userData.centreCoilMorphOffset),
           } : undefined,
@@ -477,6 +510,7 @@ export class FlowerModel implements Bloomable {
       seed: this.preset.id.length * 31,
       thickness: resolvePetalThickness(m.petalLength),
       growth: this.growth,
+      surface: this.floralSystem.petalSurface,
       colors,
     }));
     const specs = generateInflorescencePetalSpecs(kind, m.petalCount);
@@ -562,9 +596,16 @@ export class FlowerModel implements Bloomable {
       seed: 93,
       thickness: rayThickness,
       growth: this.growth,
+      surface: this.floralSystem.petalSurface,
       colors,
     }));
-    for (let index = 0; index < m.petalCount; index += 1) {
+    const rayNode = findOrganNode(this.organGraph, 'ray-floret');
+    const rayPlacements = rayNode
+      ? generateOrganPlacements(rayNode, { count: m.petalCount, layers: 1 })
+      : [];
+    const rayGrowth = findOrganGrowth(this.organSchedule, rayNode?.id ?? 'ray-florets');
+    for (const organPlacement of rayPlacements) {
+      const index = organPlacement.index;
       const clearance = computePetalClearance({
         width: m.petalWidth,
         count: m.petalCount,
@@ -575,7 +616,7 @@ export class FlowerModel implements Bloomable {
         thickness: rayThickness,
       });
       const radialBase = Math.max(m.headRadius * 0.88, clearance.radialBase);
-      const angle = index / m.petalCount * Math.PI * 2;
+      const angle = organPlacement.angle;
       const radial = new THREE.Group();
       radial.rotation.y = angle;
       const hinge = new THREE.Group();
@@ -591,7 +632,7 @@ export class FlowerModel implements Bloomable {
       this.petals.push({
         hinge,
         mesh,
-        delay: this.growth.openingStart + (index % 4) * 0.008,
+        delay: rayGrowth.start + organPlacement.rank * rayGrowth.rankDelay * 0.08 + (index % 4) * 0.008,
         openAngle: m.openAngle + Math.sin(index * 1.7) * 4,
         closedAngle: m.closedAngle,
         closedRoll,
@@ -599,7 +640,7 @@ export class FlowerModel implements Bloomable {
         sweep: Math.sin(index * 2.3) * m.twist * 0.18 * DEG,
         phase: index * 0.58,
         growth: 1,
-        span: this.growth.openingSpan,
+        span: rayGrowth.span,
         radialBase,
         baseLift: 0.1,
         laneDepth: clearance.laneDepth,
@@ -653,17 +694,31 @@ export class FlowerModel implements Bloomable {
         basalEpinasty: 0.08,
         marginGrowth: 0.06,
       },
+      surface: {
+        ...this.floralSystem.petalSurface,
+        baseWidth: 0.08,
+        midWidth: 0.56,
+        shoulderWidth: 0.64,
+        tipWidth: 0.05,
+        shoulderPosition: 0.58,
+        lateralCup: 0.12,
+      },
       colors: sepalColors,
     }));
     const isSunflower = this.preset.kind === 'sunflower';
     // Start below the bud with a positive, downward hinge angle. The previous
     // negative angle raised the sepal tip into the closed corolla.
     const openAngle = isSunflower ? 138 : this.preset.id === 'lotus' ? 118 : 128;
-    const delay = Math.max(0.015, this.growth.openingStart - (isSunflower ? 0.08 : 0.1));
-    const span = Math.min(0.62, Math.max(0.3, this.growth.openingSpan * (isSunflower ? 0.9 : 0.72)));
-    for (let index = 0; index < m.sepalCount; index += 1) {
+    const sepalNode = findOrganNode(this.organGraph, 'sepal');
+    if (!sepalNode) return;
+    const sepalPlacements = generateOrganPlacements(sepalNode, { count: m.sepalCount, layers: 1 });
+    const sepalGrowth = findOrganGrowth(this.organSchedule, sepalNode.id);
+    const delay = sepalGrowth.start;
+    const span = Math.min(0.62, sepalGrowth.span * (isSunflower ? 1.12 : 1));
+    for (const organPlacement of sepalPlacements) {
+      const index = organPlacement.index;
       const radial = new THREE.Group();
-      radial.rotation.y = index / m.sepalCount * Math.PI * 2 + GOLDEN_ANGLE * 0.2;
+      radial.rotation.y = organPlacement.angle + GOLDEN_ANGLE * 0.2;
       const hinge = new THREE.Group();
       hinge.position.set(0, placement.sepalBaseLift, placement.sepalRadius);
       const closedRoll = (index % 2 === 0 ? -1 : 1) * 1.5 * DEG;
@@ -695,19 +750,29 @@ export class FlowerModel implements Bloomable {
 
   private buildReproductiveCenter(): void {
     const { morphology: m, colors } = this.preset;
+    const stamenNode = findOrganNode(this.organGraph, 'stamen');
+    const stamenPlacements = stamenNode
+      ? generateOrganPlacements(stamenNode, {
+        count: m.stamens,
+        layers: this.floralSystem.traits.androecium.whorls,
+      })
+      : [];
     const filamentGeometry = this.track(new THREE.CylinderGeometry(0.008, 0.014, Math.max(0.05, m.stamenLength), 6));
     filamentGeometry.translate(0, m.stamenLength * 0.5, 0);
     const antherGeometry = this.track(new THREE.SphereGeometry(Math.max(0.024, m.stamenLength * 0.055), 8, 6));
     antherGeometry.scale(1.55, 0.58, 0.82);
     const filamentMaterial = this.track(makeStandardMaterial({ color: colors.tip, roughness: 0.72 }));
     const antherMaterial = this.track(makeStandardMaterial({ color: colors.pollen, roughness: 0.78 }));
-    const filaments = new THREE.InstancedMesh(filamentGeometry, filamentMaterial, m.stamens);
-    const anthers = new THREE.InstancedMesh(antherGeometry, antherMaterial, m.stamens);
+    const filaments = new THREE.InstancedMesh(filamentGeometry, filamentMaterial, stamenPlacements.length);
+    const anthers = new THREE.InstancedMesh(antherGeometry, antherMaterial, stamenPlacements.length);
     const random = seededRandom(this.preset.id.length * 947);
-    for (let index = 0; index < m.stamens; index += 1) {
-      const t = (index + 0.5) / Math.max(1, m.stamens);
+    for (const organPlacement of stamenPlacements) {
+      const index = organPlacement.index;
+      const t = stamenNode?.arrangement === 'whorled'
+        ? 0.2 + organPlacement.normalizedLayer * 0.72
+        : (index + 0.5) / Math.max(1, stamenPlacements.length);
       const radius = m.headRadius * (0.34 + t * 0.5);
-      const angle = index * GOLDEN_ANGLE;
+      const angle = organPlacement.angle;
       const lengthScale = 0.78 + random() * 0.35;
       this.dummy.position.set(Math.sin(angle) * radius, 0.03, Math.cos(angle) * radius);
       this.dummy.rotation.set((0.12 + t * 0.32) * Math.cos(angle), angle, (0.12 + t * 0.32) * -Math.sin(angle));
@@ -728,6 +793,11 @@ export class FlowerModel implements Bloomable {
     this.revealGroups.push(this.stamenGroup);
 
     const centerMaterial = this.track(makeStandardMaterial({ color: colors.center, roughness: 0.66 }));
+    const carpelNode = findOrganNode(this.organGraph, 'carpel');
+    const carpelCount = Math.min(80, Math.max(1, carpelNode?.count ?? 1));
+    const carpelPlacements = carpelNode
+      ? generateOrganPlacements(carpelNode, { count: carpelCount, layers: 1 })
+      : [];
     if (this.preset.id === 'lotus') {
       const receptacle = new THREE.Mesh(this.track(new THREE.CylinderGeometry(0.22, 0.12, 0.3, 32)), centerMaterial);
       receptacle.position.y = 0.18;
@@ -735,10 +805,11 @@ export class FlowerModel implements Bloomable {
       this.head.add(receptacle);
       const dotGeometry = this.track(new THREE.SphereGeometry(0.022, 7, 5));
       const dotMaterial = this.track(makeStandardMaterial({ color: '#72552b', roughness: 0.9 }));
-      const dots = new THREE.InstancedMesh(dotGeometry, dotMaterial, 18);
-      for (let i = 0; i < 18; i += 1) {
-        const r = Math.sqrt((i + 0.5) / 18) * 0.17;
-        const a = i * GOLDEN_ANGLE;
+      const dots = new THREE.InstancedMesh(dotGeometry, dotMaterial, carpelPlacements.length);
+      for (const organPlacement of carpelPlacements) {
+        const i = organPlacement.index;
+        const r = Math.sqrt((i + 0.5) / Math.max(1, carpelPlacements.length)) * 0.17;
+        const a = organPlacement.angle;
         this.dummy.position.set(Math.sin(a) * r, 0.34, Math.cos(a) * r);
         this.dummy.rotation.set(0, 0, 0);
         this.dummy.scale.setScalar(1);
@@ -760,13 +831,22 @@ export class FlowerModel implements Bloomable {
       stigma.position.y = 0.12 + styleHeight;
       this.head.add(ovary, style, stigma);
       this.revealGroups.push(ovary, style, stigma);
+      if (carpelNode?.fusion === 'free' && carpelPlacements.length > 1) {
+        const lobeGeometry = this.track(new THREE.SphereGeometry(Math.max(0.012, m.headRadius * 0.055), 8, 6));
+        const lobes = new THREE.InstancedMesh(lobeGeometry, centerMaterial, carpelPlacements.length);
+        for (const organPlacement of carpelPlacements) {
+          const radius = Math.sqrt((organPlacement.index + 0.5) / carpelPlacements.length) * m.headRadius * 0.21;
+          this.dummy.position.set(Math.sin(organPlacement.angle) * radius, 0.105, Math.cos(organPlacement.angle) * radius);
+          this.dummy.rotation.set(0, organPlacement.angle, 0);
+          this.dummy.scale.set(1, 0.72, 1);
+          this.dummy.updateMatrix();
+          lobes.setMatrixAt(organPlacement.index, this.dummy.matrix);
+        }
+        lobes.castShadow = true;
+        this.head.add(lobes);
+        this.revealGroups.push(lobes);
+      }
     }
-  }
-
-  private distributePetals(total: number, layers: number): number[] {
-    const counts = Array.from({ length: layers }, () => Math.floor(total / layers));
-    for (let i = 0; i < total % layers; i += 1) counts[i] += 1;
-    return counts;
   }
 
   update(progress: number, time: number): void {
@@ -856,10 +936,12 @@ export class FlowerModel implements Bloomable {
       sepal.hinge.position.y = sepal.baseLift - sepal.drop * release;
       sepal.mesh.morphTargetInfluences![0] = local;
     }
-    const reveal = evaluateReproductiveReveal(this.growth, progress);
+    const stamenGrowth = evaluateOrganGrowth(findOrganGrowth(this.organSchedule, 'stamens'), progress);
+    const carpelGrowth = evaluateOrganGrowth(findOrganGrowth(this.organSchedule, 'carpels'), progress);
+    const reveal = stamenGrowth.deployment;
     this.stamenGroup.scale.setScalar(Math.max(0.03, reveal));
     this.stamenGroup.position.y = THREE.MathUtils.lerp(-0.08, 0, reveal);
-    for (const object of this.revealGroups) object.visible = progress > this.growth.reproductiveReveal - 0.04;
+    for (const object of this.revealGroups) object.visible = stamenGrowth.visible || carpelGrowth.visible;
 
     if (this.discMesh && (Math.abs(progress - this.lastProgress) > 0.001 || progress === 0 || progress === 1)) {
       this.discFlorets.forEach((floret, index) => {
