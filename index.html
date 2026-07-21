@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#0d1513" />
     <meta name="description" content="WebGPU 기반 실시간 꽃 개화 시뮬레이터. 장미, 튤립, 백합, 벚꽃, 연꽃, 해바라기를 관찰하고 나만의 꽃을 설계하세요." />
     <title>Floraxis — WebGPU 개화 시뮬레이터</title>
-    <script type="module" crossorigin src="./assets/index-XLbF72rQ.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/bloom-renderer-D3iFDeZU.js">
+    <script type="module" crossorigin src="./assets/index-Bg4EMSvk.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/bloom-renderer-_1ueO3Xh.js">
     <link rel="stylesheet" crossorigin href="./assets/index-CpN2Fjt4.css">
   </head>
   <body>
@@ -89,7 +89,7 @@
               <div class="section-body field-controls">
                 <label class="range-field">
                   <span>꽃 개체 수 <output data-field-output="count">120</output></span>
-                  <input type="range" min="24" max="320" step="8" data-field="count" />
+                  <input type="range" min="24" max="420" step="4" data-field="count" />
                 </label>
                 <label class="field-layout-select" for="field-layout">
                   <span>꽃밭 배치 유형</span>
@@ -177,7 +177,7 @@
                   <input id="field-seed" type="number" min="1" max="999999" step="1" value="240617" />
                   <button type="button" id="field-regenerate">새 배치</button>
                 </div>
-                <p class="field-lod-note">흙 굴곡 위에 잔풀·수풀·작은 돌을 결정론적으로 섞습니다. 바람장은 수풀과 꽃대·잎·꽃잎에 서로 다른 강성과 난류로 전달됩니다.</p>
+                <p class="field-lod-note">카메라 시야와 거리에 따라 HERO→NEAR→MID→FAR→CULL 5단계로 꽃잎·잎·가지 밀도와 애니메이션 주기를 자동 조절합니다. 프레임 부하가 높으면 적응 품질 단계가 기하 밀도까지 함께 낮춥니다.</p>
               </div>
             </section>
 
@@ -483,6 +483,5 @@
 
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
-
   </body>
 </html>
