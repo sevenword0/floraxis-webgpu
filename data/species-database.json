@@ -1,0 +1,1018 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-21T22:47:58.379Z",
+  "generationMode": "cached-build",
+  "catalog": {
+    "eflower": {
+      "label": "eFLOWER floral traits",
+      "url": "https://opentraits.org/datasets/e-flower.html",
+      "license": "CC BY 4.0"
+    },
+    "gbif": {
+      "label": "GBIF Species API",
+      "url": "https://techdocs.gbif.org/en/openapi/v1/species",
+      "license": "GBIF terms; taxonomy metadata only"
+    },
+    "crossref": {
+      "label": "Crossref REST API",
+      "url": "https://www.crossref.org/documentation/retrieve-metadata/rest-api/",
+      "license": "Crossref metadata; article content excluded"
+    }
+  },
+  "policy": {
+    "storesArticleContent": false,
+    "preservesSourceUrls": true,
+    "preservesLicenses": true,
+    "requiresManualReviewBelowConfidence": 80
+  },
+  "stats": {
+    "speciesRecords": 9,
+    "taxonomyMatched": 9,
+    "machineVerified": 8,
+    "sourceLinks": 16,
+    "refreshFailures": 0
+  },
+  "records": [
+    {
+      "id": "rose",
+      "displayName": "다마스크 장미",
+      "scientificName": "Rosa × damascena",
+      "family": "Rosaceae",
+      "taxonomy": {
+        "key": "78YCG",
+        "acceptedName": "Rosa × damascena Mill.",
+        "canonicalName": "Rosa damascena",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 99,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "MG",
+            "name": "Magnoliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "3Z6",
+            "name": "Rosales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "FTK",
+            "name": "Rosaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "628NC",
+            "name": "Rosoideae",
+            "rank": "SUBFAMILY"
+          },
+          {
+            "key": "KTYKX",
+            "name": "Roseae",
+            "rank": "TRIBE"
+          },
+          {
+            "key": "63S6D",
+            "name": "Rosa",
+            "rank": "GENUS"
+          },
+          {
+            "key": "78YCG",
+            "name": "Rosa damascena",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "veined",
+        "color": "#7b1836",
+        "strength": 0.22,
+        "veinFrequency": 5,
+        "spotDensity": 0,
+        "edgeStrength": 0.08,
+        "centerStrength": 0.22,
+        "seed": 17
+      },
+      "references": [
+        {
+          "label": "Rose petal cell expansion",
+          "url": "https://doi.org/10.2503/jjshs1.78.356",
+          "doi": "10.2503/jjshs1.78.356",
+          "metadata": {
+            "doi": "10.2503/jjshs1.78.356",
+            "title": "Cell Division and Expansion Growth during Rose Petal Development",
+            "publisher": "Japanese Society for Horticultural Science",
+            "published": "2009",
+            "authors": [
+              "Kunio Yamada",
+              "Ryo Norikoshi",
+              "Katsumi Suzuki",
+              "Takaaki Nishijima",
+              "Hideo Imanishi",
+              "Kazuo Ichimura"
+            ],
+            "licenseUrls": [],
+            "url": "https://doi.org/10.2503/jjshs1.78.356"
+          },
+          "usage": "bibliographic metadata only"
+        },
+        {
+          "label": "RHS Damask rose",
+          "url": "https://www.rhs.org.uk/plants/33926/rosa-x-damascena-d/details",
+          "metadata": null,
+          "usage": "linked reference only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 5,
+        "confidence": 100,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    },
+    {
+      "id": "tulip",
+      "displayName": "아펠도른 튤립",
+      "scientificName": "Tulipa gesneriana",
+      "family": "Liliaceae",
+      "taxonomy": {
+        "key": "59KYV",
+        "acceptedName": "Tulipa gesneriana L.",
+        "canonicalName": "Tulipa gesneriana",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 98,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "L2L",
+            "name": "Liliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "623DL",
+            "name": "Liliales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "6259D",
+            "name": "Liliaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "8W4GT",
+            "name": "Tulipa",
+            "rank": "GENUS"
+          },
+          {
+            "key": "59KYV",
+            "name": "Tulipa gesneriana",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "star",
+        "color": "#5e1715",
+        "strength": 0.46,
+        "veinFrequency": 4,
+        "spotDensity": 0,
+        "edgeStrength": 0.04,
+        "centerStrength": 0.52,
+        "seed": 29
+      },
+      "references": [
+        {
+          "label": "Tulip thermonasty",
+          "url": "https://doi.org/10.1093/jxb/4.1.65",
+          "doi": "10.1093/jxb/4.1.65",
+          "metadata": {
+            "doi": "10.1093/jxb/4.1.65",
+            "title": "Thermonasty in Tulip and Crocus Flowers",
+            "publisher": "Oxford University Press (OUP)",
+            "published": "1953",
+            "authors": [
+              "W. M. L. WOOD"
+            ],
+            "licenseUrls": [],
+            "url": "https://doi.org/10.1093/jxb/4.1.65"
+          },
+          "usage": "bibliographic metadata only"
+        },
+        {
+          "label": "Aquaporin and tulip opening",
+          "url": "https://doi.org/10.1093/pcp/pch069",
+          "doi": "10.1093/pcp/pch069",
+          "metadata": {
+            "doi": "10.1093/pcp/pch069",
+            "title": "Phosphorylation of Plasma Membrane Aquaporin Regulates Temperature-Dependent Opening of Tulip Petals",
+            "publisher": "Oxford University Press (OUP)",
+            "published": "2004-5-1",
+            "authors": [
+              "Abul Kalam Azad",
+              "Yoshihiro Sawa",
+              "Takahiro Ishikawa",
+              "Hitoshi Shibata"
+            ],
+            "licenseUrls": [],
+            "url": "https://doi.org/10.1093/pcp/pch069"
+          },
+          "usage": "bibliographic metadata only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 5,
+        "confidence": 99,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    },
+    {
+      "id": "lily",
+      "displayName": "오리엔탈 백합",
+      "scientificName": "Lilium orientale",
+      "family": "Liliaceae",
+      "taxonomy": {
+        "key": "8VYWZ",
+        "acceptedName": "Lilium Tourn. ex L.",
+        "canonicalName": "Lilium",
+        "rank": "GENUS",
+        "status": "ACCEPTED",
+        "matchType": "HIGHERRANK",
+        "confidence": 94,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "L2L",
+            "name": "Liliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "623DL",
+            "name": "Liliales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "6259D",
+            "name": "Liliaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "8VYWZ",
+            "name": "Lilium",
+            "rank": "GENUS"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "speckled",
+        "color": "#7b2548",
+        "strength": 0.62,
+        "veinFrequency": 6,
+        "spotDensity": 0.48,
+        "edgeStrength": 0.06,
+        "centerStrength": 0.3,
+        "seed": 43
+      },
+      "references": [
+        {
+          "label": "Growth, geometry and mechanics of a blooming lily",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3078366/",
+          "metadata": null,
+          "usage": "linked reference only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 4,
+        "confidence": 74,
+        "taxonomicPrecision": "higher-rank-only",
+        "reviewStatus": "review-required"
+      }
+    },
+    {
+      "id": "sakura",
+      "displayName": "왕벚나무",
+      "scientificName": "Prunus × yedoensis",
+      "family": "Rosaceae",
+      "taxonomy": {
+        "key": "4N9DD",
+        "acceptedName": "Prunus × yedoensis Matsum.",
+        "canonicalName": "Prunus yedoensis",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 99,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "MG",
+            "name": "Magnoliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "3Z6",
+            "name": "Rosales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "FTK",
+            "name": "Rosaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "BVBB9",
+            "name": "Amygdaloideae",
+            "rank": "SUBFAMILY"
+          },
+          {
+            "key": "KTXSK",
+            "name": "Amygdaleae",
+            "rank": "TRIBE"
+          },
+          {
+            "key": "6Y6H",
+            "name": "Prunus",
+            "rank": "GENUS"
+          },
+          {
+            "key": "4N9DD",
+            "name": "Prunus yedoensis",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "picotee",
+        "color": "#b13b69",
+        "strength": 0.26,
+        "veinFrequency": 5,
+        "spotDensity": 0,
+        "edgeStrength": 0.38,
+        "centerStrength": 0.3,
+        "seed": 59
+      },
+      "references": [
+        {
+          "label": "Somei-Yoshino floral organ development",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8825344/",
+          "metadata": null,
+          "usage": "linked reference only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 4,
+        "confidence": 100,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    },
+    {
+      "id": "lotus",
+      "displayName": "연꽃",
+      "scientificName": "Nelumbo nucifera",
+      "family": "Nelumbonaceae",
+      "taxonomy": {
+        "key": "465R5",
+        "acceptedName": "Nelumbo nucifera Gaertn.",
+        "canonicalName": "Nelumbo nucifera",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 99,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "MG",
+            "name": "Magnoliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "3WP",
+            "name": "Proteales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "D7Q",
+            "name": "Nelumbonaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "5YDS",
+            "name": "Nelumbo",
+            "rank": "GENUS"
+          },
+          {
+            "key": "465R5",
+            "name": "Nelumbo nucifera",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "picotee",
+        "color": "#c8507c",
+        "strength": 0.3,
+        "veinFrequency": 7,
+        "spotDensity": 0,
+        "edgeStrength": 0.46,
+        "centerStrength": 0.12,
+        "seed": 71
+      },
+      "references": [
+        {
+          "label": "Nelumbo floral development",
+          "url": "https://doi.org/10.1086/317577",
+          "doi": "10.1086/317577",
+          "metadata": {
+            "doi": "10.1086/317577",
+            "title": "Floral Development of <i>Nelumbo nucifera</i> (Nelumbonaceae)",
+            "publisher": "University of Chicago Press",
+            "published": "2000-11",
+            "authors": [
+              "Virginia Hayes",
+              "Edward L. Schneider",
+              "Sherwin Carlquist"
+            ],
+            "licenseUrls": [],
+            "url": "https://doi.org/10.1086/317577"
+          },
+          "usage": "bibliographic metadata only"
+        },
+        {
+          "label": "Petal structural changes",
+          "url": "https://doi.org/10.1002/ajb2.16433",
+          "doi": "10.1002/ajb2.16433",
+          "metadata": {
+            "doi": "10.1002/ajb2.16433",
+            "title": "Structural changes in <i>Nelumbo</i> flower petals during opening and closing",
+            "publisher": "Wiley",
+            "published": "2024-11",
+            "authors": [
+              "Fumiko Ishizuna",
+              "Ukin Yo",
+              "Natsumi Yoshimura",
+              "Atsushi Shirai",
+              "Toshihiro Aono",
+              "Nobuhiro Tsutsumi",
+              "Shin‐Ichi Arimura",
+              "Hideki Takanashi"
+            ],
+            "licenseUrls": [
+              "http://onlinelibrary.wiley.com/termsAndConditions#vor"
+            ],
+            "url": "https://doi.org/10.1002/ajb2.16433"
+          },
+          "usage": "bibliographic metadata only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 5,
+        "confidence": 100,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    },
+    {
+      "id": "sunflower",
+      "displayName": "해바라기",
+      "scientificName": "Helianthus annuus",
+      "family": "Asteraceae",
+      "taxonomy": {
+        "key": "3K5TS",
+        "acceptedName": "Helianthus annuus L.",
+        "canonicalName": "Helianthus annuus",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 98,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "MG",
+            "name": "Magnoliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "ST",
+            "name": "Asterales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "622TP",
+            "name": "Asteraceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "J6T",
+            "name": "Asteroideae",
+            "rank": "SUBFAMILY"
+          },
+          {
+            "key": "KVBCQ",
+            "name": "Heliantheae",
+            "rank": "TRIBE"
+          },
+          {
+            "key": "KVBFN",
+            "name": "Helianthinae",
+            "rank": "SUBTRIBE"
+          },
+          {
+            "key": "62TKF",
+            "name": "Helianthus",
+            "rank": "GENUS"
+          },
+          {
+            "key": "3K5TS",
+            "name": "Helianthus annuus",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "star",
+        "color": "#8c4211",
+        "strength": 0.28,
+        "veinFrequency": 5,
+        "spotDensity": 0,
+        "edgeStrength": 0.12,
+        "centerStrength": 0.44,
+        "seed": 83
+      },
+      "references": [
+        {
+          "label": "Capitulum and ray-flower development",
+          "url": "https://academic.oup.com/aob/article/137/1/47/8195846",
+          "metadata": null,
+          "usage": "linked reference only"
+        },
+        {
+          "label": "Sunflower reproductive progression",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9587322/",
+          "metadata": null,
+          "usage": "linked reference only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 5,
+        "confidence": 99,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    },
+    {
+      "id": "hydrangea",
+      "displayName": "큰잎수국",
+      "scientificName": "Hydrangea macrophylla",
+      "family": "Hydrangeaceae",
+      "taxonomy": {
+        "key": "3N4D6",
+        "acceptedName": "Hydrangea macrophylla (Thunb.) Ser.",
+        "canonicalName": "Hydrangea macrophylla",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 98,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "MG",
+            "name": "Magnoliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "ZT",
+            "name": "Cornales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "B82",
+            "name": "Hydrangeaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "JPZ",
+            "name": "Hydrangeoideae",
+            "rank": "SUBFAMILY"
+          },
+          {
+            "key": "KVG2G",
+            "name": "Hydrangeeae",
+            "rank": "TRIBE"
+          },
+          {
+            "key": "L27TC",
+            "name": "Hydrangea",
+            "rank": "GENUS"
+          },
+          {
+            "key": "3N4D6",
+            "name": "Hydrangea macrophylla",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "veined",
+        "color": "#6273bd",
+        "strength": 0.2,
+        "veinFrequency": 4,
+        "spotDensity": 0,
+        "edgeStrength": 0.22,
+        "centerStrength": 0.18,
+        "seed": 97
+      },
+      "references": [
+        {
+          "label": "Hydrangea sterile and fertile flower development",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9694991/",
+          "metadata": null,
+          "usage": "linked reference only"
+        },
+        {
+          "label": "Mophead architecture",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7049302/",
+          "metadata": null,
+          "usage": "linked reference only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 5,
+        "confidence": 99,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    },
+    {
+      "id": "hydrangea-lacecap",
+      "displayName": "레이스캡 수국",
+      "scientificName": "Hydrangea macrophylla",
+      "family": "Hydrangeaceae",
+      "taxonomy": {
+        "key": "3N4D6",
+        "acceptedName": "Hydrangea macrophylla (Thunb.) Ser.",
+        "canonicalName": "Hydrangea macrophylla",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 98,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "MG",
+            "name": "Magnoliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "ZT",
+            "name": "Cornales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "B82",
+            "name": "Hydrangeaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "JPZ",
+            "name": "Hydrangeoideae",
+            "rank": "SUBFAMILY"
+          },
+          {
+            "key": "KVG2G",
+            "name": "Hydrangeeae",
+            "rank": "TRIBE"
+          },
+          {
+            "key": "L27TC",
+            "name": "Hydrangea",
+            "rank": "GENUS"
+          },
+          {
+            "key": "3N4D6",
+            "name": "Hydrangea macrophylla",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "picotee",
+        "color": "#4f67aa",
+        "strength": 0.28,
+        "veinFrequency": 4,
+        "spotDensity": 0,
+        "edgeStrength": 0.42,
+        "centerStrength": 0.2,
+        "seed": 109
+      },
+      "references": [
+        {
+          "label": "Lacecap fertile and decorative flower structure",
+          "url": "https://doi.org/10.1038/s41438-020-0255-y",
+          "doi": "10.1038/s41438-020-0255-y",
+          "metadata": {
+            "doi": "10.1038/s41438-020-0255-y",
+            "title": "Genome-wide association studies for inflorescence type and remontancy in Hydrangea macrophylla",
+            "publisher": "Oxford University Press (OUP)",
+            "published": "2020-3-1",
+            "authors": [
+              "Xingbo Wu",
+              "Lisa W. Alexander"
+            ],
+            "licenseUrls": [
+              "https://creativecommons.org/licenses/by/4.0"
+            ],
+            "url": "https://doi.org/10.1038/s41438-020-0255-y"
+          },
+          "usage": "bibliographic metadata only"
+        },
+        {
+          "label": "Lacecap and mophead comparison",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6651981/",
+          "metadata": null,
+          "usage": "linked reference only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 5,
+        "confidence": 99,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    },
+    {
+      "id": "wisteria",
+      "displayName": "등나무",
+      "scientificName": "Wisteria floribunda",
+      "family": "Fabaceae",
+      "taxonomy": {
+        "key": "5C2HC",
+        "acceptedName": "Wisteria floribunda (Willd.) DC.",
+        "canonicalName": "Wisteria floribunda",
+        "rank": "SPECIES",
+        "status": "ACCEPTED",
+        "matchType": "EXACT",
+        "confidence": 99,
+        "classification": [
+          {
+            "key": "CS5HF",
+            "name": "Eukaryota",
+            "rank": "DOMAIN"
+          },
+          {
+            "key": "P",
+            "name": "Plantae",
+            "rank": "KINGDOM"
+          },
+          {
+            "key": "CMQ8S",
+            "name": "Pteridobiotina",
+            "rank": "SUBKINGDOM"
+          },
+          {
+            "key": "TP",
+            "name": "Tracheophyta",
+            "rank": "PHYLUM"
+          },
+          {
+            "key": "MG",
+            "name": "Magnoliopsida",
+            "rank": "CLASS"
+          },
+          {
+            "key": "383",
+            "name": "Fabales",
+            "rank": "ORDER"
+          },
+          {
+            "key": "623QT",
+            "name": "Fabaceae",
+            "rank": "FAMILY"
+          },
+          {
+            "key": "9CMFZ",
+            "name": "Wisteria",
+            "rank": "GENUS"
+          },
+          {
+            "key": "5C2HC",
+            "name": "Wisteria floribunda",
+            "rank": "SPECIES"
+          }
+        ]
+      },
+      "pattern": {
+        "mode": "star",
+        "color": "#563d91",
+        "strength": 0.36,
+        "veinFrequency": 5,
+        "spotDensity": 0.08,
+        "edgeStrength": 0.12,
+        "centerStrength": 0.46,
+        "seed": 127
+      },
+      "references": [
+        {
+          "label": "Native Plant Trust Wisteria floribunda",
+          "url": "https://gobotany.nativeplanttrust.org/species/wisteria/floribunda/",
+          "metadata": null,
+          "usage": "linked reference only"
+        },
+        {
+          "label": "RHS Wisteria floribunda",
+          "url": "https://www.rhs.org.uk/plants/145006/wisteria-floribunda-geisha/details",
+          "metadata": null,
+          "usage": "linked reference only"
+        }
+      ],
+      "provenance": {
+        "eflowerLicense": "CC BY 4.0",
+        "taxonomyProvider": "GBIF Species API",
+        "bibliographyProvider": "Crossref REST API",
+        "sourceCount": 5,
+        "confidence": 100,
+        "taxonomicPrecision": "species-or-below",
+        "reviewStatus": "machine-verified"
+      }
+    }
+  ]
+}

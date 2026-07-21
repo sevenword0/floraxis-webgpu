@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#0d1513" />
     <meta name="description" content="WebGPU 기반 실시간 꽃 개화 시뮬레이터. 장미, 튤립, 백합, 벚꽃, 연꽃, 해바라기를 관찰하고 나만의 꽃을 설계하세요." />
     <title>Floraxis — WebGPU 개화 시뮬레이터</title>
-    <script type="module" crossorigin src="./assets/index-Bg4EMSvk.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/bloom-renderer-_1ueO3Xh.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-CpN2Fjt4.css">
+    <script type="module" crossorigin src="./assets/index-DPUbFBTt.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/bloom-renderer-DI816Zpt.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-M1CLO-Qf.css">
   </head>
   <body>
     <div id="app">
@@ -475,6 +475,19 @@
               <p id="research-mapping" class="mapping-note"></p>
             </div>
             <div><h3>Helios · OpenAlea식 기관별 개화 스케줄</h3><div id="research-phenology" class="phenology-list"></div></div>
+            <section class="species-db-card" aria-labelledby="species-db-title">
+              <div class="species-db-heading">
+                <div><span>07 AUTO-GENERATED DATA</span><h3 id="species-db-title">종별 생성 데이터베이스</h3></div>
+                <strong id="species-db-status">DB 불러오는 중</strong>
+              </div>
+              <p id="species-db-summary">GBIF 분류와 Crossref 학술 메타데이터를 캐시에서 불러옵니다.</p>
+              <div id="species-db-metrics" class="growth-grid"></div>
+              <p id="species-db-taxonomy" class="mapping-note"></p>
+              <div class="species-db-actions">
+                <a id="species-db-download" href="./data/species-database.json" download>전체 DB JSON 내려받기</a>
+                <span>논문 본문은 저장하지 않으며 출처·라이선스·검수 상태를 보존합니다.</span>
+              </div>
+            </section>
             <div><h3>참고한 학술·형태 자료</h3><div id="research-sources" class="source-list"></div></div>
             <p class="research-note">백분율은 논문의 원시 계측값 자체가 아니라, 관찰된 상대 변화와 메커니즘을 화면 크기에 맞게 정규화한 시뮬레이션 계수입니다. 이 앱은 분자·세포 수준의 생장 전체를 계산하는 생물역학 해석기가 아닙니다.</p>
           </div>
