@@ -31,6 +31,9 @@
             <span id="fps-label">— FPS</span>
           </div>
           <div class="topbar-actions">
+            <a class="icon-button" href="./lighting-test.html" aria-label="조명 QA 테스트 앱 열기" title="Lighting QA Lab">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v2.2M12 19.8V22M4.93 4.93l1.56 1.56M17.51 17.51l1.56 1.56M2 12h2.2M19.8 12H22M4.93 19.07l1.56-1.56M17.51 6.49l1.56-1.56"/></svg>
+            </a>
             <button class="icon-button" id="research-open" type="button" aria-label="식물학 연구 노트 열기" title="식물학 연구 노트">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13Z"/><path d="M4 19.5V6.5A2.5 2.5 0 0 1 6.5 4"/><path d="M8 8h8M8 12h6"/></svg>
             </button>
@@ -46,6 +49,10 @@
 
         <nav class="preset-rail glass-panel" aria-label="꽃 프리셋">
           <div class="panel-kicker"><span>01</span> SPECIES</div>
+          <div class="scene-mode" role="group" aria-label="시뮬레이션 장면">
+            <button type="button" data-scene-mode="specimen" class="is-active" aria-pressed="true">한 송이</button>
+            <button type="button" data-scene-mode="field" aria-pressed="false">프리셋 꽃밭</button>
+          </div>
           <div id="preset-list" class="preset-list"></div>
           <button id="custom-card" class="preset-card preset-card--custom" type="button" data-preset="custom">
             <span class="preset-index">+</span>
@@ -55,7 +62,7 @@
 
         <aside class="inspector glass-panel" id="inspector" aria-label="꽃 형태 및 렌더 설정">
           <div class="inspector-scroll">
-            <section class="specimen-heading">
+            <section class="specimen-heading specimen-only">
               <div class="panel-kicker"><span>02</span> SPECIMEN</div>
               <p id="preset-eyebrow" class="specimen-eyebrow">ASYMMETRIC GROWTH</p>
               <h1 id="preset-name">다마스크 장미</h1>
@@ -64,7 +71,171 @@
               <div id="structure-tags" class="structure-tags"></div>
             </section>
 
-            <section class="control-section" aria-labelledby="morph-title">
+            <section class="field-heading field-only is-hidden" aria-labelledby="field-heading-title">
+              <div class="panel-kicker"><span>02</span> FIELD STUDY</div>
+              <p class="specimen-eyebrow">INSTANCED ECOSYSTEM</p>
+              <h1 id="field-heading-title">프리셋 꽃밭</h1>
+              <p class="description">선택한 꽃들의 개화 시차와 바람 위상을 분산해 한 방향으로 번지는 군락 개화를 관찰합니다.</p>
+              <div class="field-summary" aria-live="polite"><strong id="field-summary-count">120</strong> FLOWERS · <strong id="field-summary-species">6</strong> SPECIES</div>
+            </section>
+
+            <section class="control-section field-only is-hidden" aria-labelledby="field-title">
+              <button class="section-heading" id="field-title" type="button" aria-expanded="true">
+                <span><i>03</i> FIELD COMPOSITION</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
+              </button>
+              <div class="section-body field-controls">
+                <label class="range-field">
+                  <span>꽃 개체 수 <output data-field-output="count">120</output></span>
+                  <input type="range" min="24" max="320" step="8" data-field="count" />
+                </label>
+                <label class="field-layout-select" for="field-layout">
+                  <span>꽃밭 배치 유형</span>
+                  <select id="field-layout">
+                    <option value="scatter">자유 산포</option>
+                    <option value="species-rows">종별 줄</option>
+                    <option value="concentric">동심원</option>
+                    <option value="species-sectors">종별 부채꼴</option>
+                    <option value="radial-composite">중심원 · 부채 · 외곽원</option>
+                    <option value="flower-tunnel">꽃 터널</option>
+                    <option value="flower-road-walls">양벽 꽃길</option>
+                  </select>
+                </label>
+                <p class="field-layout-note" id="field-layout-note"></p>
+                <label class="range-field">
+                  <span>랜덤 혼합 강도 <output data-field-output="mixStrength">100%</output></span>
+                  <input type="range" min="0" max="1" step="0.01" data-field="mixStrength" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>종별 줄 수 <output data-field-output="rowsPerSpecies">2줄/종</output></span><input type="range" min="1" max="6" step="1" data-field="rowsPerSpecies" /></label>
+                  <label class="range-field"><span>동심원 수 <output data-field-output="ringCount">6겹</output></span><input type="range" min="2" max="12" step="1" data-field="ringCount" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>꽃밭 반경 <output data-field-output="radius">6.5m</output></span><input type="range" min="3" max="9" step="0.25" data-field="radius" /></label>
+                  <label class="range-field"><span>최소 간격 <output data-field-output="spacing">0.52m</output></span><input type="range" min="0.18" max="0.9" step="0.01" data-field="spacing" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>개화 파동 <output data-field-output="bloomWave">64%</output></span><input type="range" min="0" max="1" step="0.01" data-field="bloomWave" /></label>
+                  <label class="range-field"><span>개화 편차 <output data-field-output="bloomVariance">32%</output></span><input type="range" min="0" max="1" step="0.01" data-field="bloomVariance" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>바람 세기 <output data-field-output="wind">36%</output></span><input type="range" min="0" max="1" step="0.01" data-field="wind" /></label>
+                  <label class="range-field"><span>바람 난류 <output data-field-output="windTurbulence">58%</output></span><input type="range" min="0" max="1" step="0.01" data-field="windTurbulence" /></label>
+                </div>
+                <div>
+                  <span class="field-label">지표 생태층</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>잔풀·지피 <output data-field-output="groundCover">88%</output></span><input type="range" min="0" max="1" step="0.01" data-field="groundCover" /></label>
+                    <label class="range-field"><span>수풀 밀도 <output data-field-output="shrubDensity">76%</output></span><input type="range" min="0" max="1" step="0.01" data-field="shrubDensity" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>작은 돌 <output data-field-output="rockDensity">42%</output></span><input type="range" min="0" max="1" step="0.01" data-field="rockDensity" /></label>
+                    <label class="range-field"><span>흙 굴곡 <output data-field-output="terrainRelief">38%</output></span><input type="range" min="0" max="1" step="0.01" data-field="terrainRelief" /></label>
+                  </div>
+                </div>
+                <div>
+                  <span class="field-label">꽃 구성</span>
+                  <div id="field-species" class="species-mix" role="group" aria-label="꽃밭에 포함할 꽃"></div>
+                </div>
+                <div class="field-color-panel">
+                  <span class="field-label">종별 외형 조정</span>
+                  <label class="field-layout-select" for="field-color-species">
+                    <span>조정할 꽃 종류</span>
+                    <select id="field-color-species"></select>
+                  </label>
+                  <div class="split-fields">
+                    <label class="range-field">
+                      <span>높이 랜덤 <output id="field-height-variation-output">35%</output></span>
+                      <input id="field-height-variation" type="range" min="0" max="1" step="0.01" value="0.35" />
+                    </label>
+                    <label class="range-field">
+                      <span>꽃 크기 랜덤 <output id="field-flower-size-variation-output">35%</output></span>
+                      <input id="field-flower-size-variation" type="range" min="0" max="1" step="0.01" value="0.35" />
+                    </label>
+                  </div>
+                  <p id="field-variation-note" class="field-variation-note"></p>
+                  <button type="button" id="field-variation-reset" class="field-color-reset">높이·꽃 크기 랜덤 끄기</button>
+                  <label class="range-field">
+                    <span>줄기 두께 <output id="field-stem-scale-output">100%</output></span>
+                    <input id="field-stem-scale" type="range" min="0.35" max="2.2" step="0.01" value="1" />
+                  </label>
+                  <button type="button" id="field-stem-reset" class="field-color-reset">종 기본 두께로 초기화</button>
+                  <div class="field-color-pickers">
+                    <label>시작색 <input id="field-color-from" type="color" value="#9c1538" /></label>
+                    <label>끝색 <input id="field-color-to" type="color" value="#f46f88" /></label>
+                  </div>
+                  <label class="range-field">
+                    <span>개체별 색상 랜덤화 <output id="field-color-strength-output">18%</output></span>
+                    <input id="field-color-strength" type="range" min="0" max="1" step="0.01" value="0.18" />
+                  </label>
+                  <button type="button" id="field-color-reset" class="field-color-reset">프리셋 색상으로 초기화</button>
+                </div>
+                <div class="seed-row">
+                  <label for="field-seed">배치 시드</label>
+                  <input id="field-seed" type="number" min="1" max="999999" step="1" value="240617" />
+                  <button type="button" id="field-regenerate">새 배치</button>
+                </div>
+                <p class="field-lod-note">흙 굴곡 위에 잔풀·수풀·작은 돌을 결정론적으로 섞습니다. 바람장은 수풀과 꽃대·잎·꽃잎에 서로 다른 강성과 난류로 전달됩니다.</p>
+              </div>
+            </section>
+
+            <section class="control-section field-only is-hidden" aria-labelledby="individual-title">
+              <button class="section-heading" id="individual-title" type="button" aria-expanded="true">
+                <span><i>04</i> INDIVIDUAL BOTANY</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
+              </button>
+              <div class="section-body individual-controls">
+                <div class="individual-picker">
+                  <button type="button" id="individual-prev" aria-label="이전 꽃">←</button>
+                  <label for="individual-index">개별 꽃 ID</label>
+                  <input id="individual-index" type="number" min="1" max="120" step="1" value="1" />
+                  <button type="button" id="individual-next" aria-label="다음 꽃">→</button>
+                </div>
+                <label class="individual-species-row" for="individual-species">
+                  <span>종 선택</span>
+                  <select id="individual-species"></select>
+                </label>
+                <div class="individual-card">
+                  <strong id="individual-name">다마스크 장미 #001</strong>
+                  <small id="individual-scientific">Rosa × damascena</small>
+                  <div><span id="individual-facing">측향 · 22°</span><span id="individual-habit">분지 관목</span><span id="individual-leaf-shape">우상복엽·톱니</span></div>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span><span id="individual-height-label">실제 높이</span><output data-individual-output="heightCm">200cm</output></span><input type="range" min="8" max="1300" step="1" data-individual="heightCm" data-unit="cm" /></label>
+                  <label class="range-field"><span>꽃/꽃차례 크기 <output data-individual-output="flowerDiameterCm">7.5cm</output></span><input type="range" min="1.5" max="120" step="0.1" data-individual="flowerDiameterCm" data-unit="cm" /></label>
+                </div>
+                <label class="range-field">
+                  <span>개별 줄기 두께 <output data-individual-output="stemScale">1×</output></span>
+                  <input type="range" min="0.35" max="2.2" step="0.01" data-individual="stemScale" data-unit="×" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>측면 기울기 <output data-individual-output="headTiltDeg">22°</output></span><input type="range" min="0" max="120" step="1" data-individual="headTiltDeg" data-unit="°" /></label>
+                  <label class="range-field"><span>바라보는 방위 <output data-individual-output="headAzimuthDeg">0°</output></span><input type="range" min="0" max="359" step="1" data-individual="headAzimuthDeg" data-unit="°" /></label>
+                </div>
+                <label class="range-field">
+                  <span>꽃자루 길이 <output data-individual-output="pedicelLengthCm">5cm</output></span>
+                  <input type="range" min="0" max="60" step="0.5" data-individual="pedicelLengthCm" data-unit="cm" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>잎 크기 <output data-individual-output="leafScale">1</output></span><input type="range" min="0.25" max="2.5" step="0.05" data-individual="leafScale" /></label>
+                  <label class="range-field"><span>잎 수 <output data-individual-output="leafCount">5</output></span><input type="range" min="0" max="24" step="1" data-individual="leafCount" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>가지 수 <output data-individual-output="branchCount">3</output></span><input type="range" min="0" max="10" step="1" data-individual="branchCount" /></label>
+                  <label class="range-field"><span>가지 벌어짐 <output data-individual-output="branchAngleDeg">42°</output></span><input type="range" min="5" max="88" step="1" data-individual="branchAngleDeg" data-unit="°" /></label>
+                </div>
+                <p class="individual-structure-note" id="individual-structure-note"></p>
+                <p class="field-lod-note">cm 실측값을 저장하며, 연꽃 높이는 수중 근경과 수심을 제외한 수면 기준입니다. 한 장면에서 초본과 10m급 교목을 함께 관찰하도록 높이는 비교 축척, 꽃은 2× 세부 확대를 사용합니다. 충돌 판정은 완전 개화 지름으로 계산합니다.</p>
+                <div class="individual-actions">
+                  <button type="button" id="individual-copy">클립보드 복사</button>
+                  <button type="button" id="individual-paste">붙여넣기</button>
+                  <button type="button" id="individual-export">JSON 저장</button>
+                  <button type="button" id="individual-import">파일 적용</button>
+                  <button type="button" id="individual-reset">기본값 복원</button>
+                  <input type="file" id="individual-import-file" accept="application/json,.json" hidden />
+                </div>
+              </div>
+            </section>
+
+            <section class="control-section specimen-only" aria-labelledby="morph-title">
               <button class="section-heading" id="morph-title" type="button" aria-expanded="true">
                 <span><i>03</i> MORPHOLOGY</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
               </button>
@@ -87,12 +258,36 @@
                 </label>
                 <div class="split-fields">
                   <label class="range-field"><span>컵 곡률 <output data-output="cup">0.32</output></span><input type="range" min="-0.2" max="0.8" step="0.01" data-path="cup" /></label>
-                  <label class="range-field"><span>끝 말림 <output data-output="curl">0.42</output></span><input type="range" min="-0.35" max="1.2" step="0.01" data-path="curl" /></label>
+                  <label class="range-field"><span>꽃잎 말림 <output data-output="curl">0.42</output></span><input type="range" min="-0.35" max="1.2" step="0.01" data-path="curl" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>봉오리 말림 <output data-output="budCurl">1.02</output></span><input type="range" min="0" max="1.4" step="0.01" data-path="budCurl" /></label>
+                  <label class="range-field"><span>풀림 전파 <output data-output="unfurl">0.62</output></span><input type="range" min="0" max="1" step="0.01" data-path="unfurl" /></label>
+                </div>
+                <label class="range-field">
+                  <span>중심 말림 유지 <output data-output="innerCoil">0.58</output></span>
+                  <input type="range" min="0" max="1" step="0.01" data-path="innerCoil" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>중륵 접힘 <output data-output="fold">0.26</output></span><input type="range" min="-0.6" max="1.2" step="0.01" data-path="fold" /></label>
+                  <label class="range-field"><span>꽃잎 회전 <output data-output="twist">11°</output></span><input type="range" min="-35" max="35" step="1" data-path="twist" data-unit="°" /></label>
                 </div>
                 <label class="range-field">
                   <span>가장자리 물결 <output data-output="waviness">0.04</output></span>
                   <input type="range" min="0" max="0.3" step="0.005" data-path="waviness" />
                 </label>
+                <div class="surface-controls" aria-label="파라메트릭 꽃잎 표면">
+                  <span class="render-subtitle">BEZIER · NURBS PETAL SURFACE</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>어깨 너비 <output data-surface-output="shoulderWidth">1.08</output></span><input type="range" min="0.18" max="1.5" step="0.01" data-surface="shoulderWidth" /></label>
+                    <label class="range-field"><span>중륵 아치 <output data-surface-output="midribArch">0.09</output></span><input type="range" min="-0.3" max="0.55" step="0.01" data-surface="midribArch" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>횡방향 컵 <output data-surface-output="lateralCup">0.32</output></span><input type="range" min="-0.3" max="0.7" step="0.01" data-surface="lateralCup" /></label>
+                    <label class="range-field"><span>좌우 비대칭 <output data-surface-output="asymmetry">0.08</output></span><input type="range" min="-0.4" max="0.4" step="0.01" data-surface="asymmetry" /></label>
+                  </div>
+                  <label class="range-field"><span>NURBS 가중치 <output data-surface-output="rationalWeight">1.18</output></span><input type="range" min="0.55" max="2" step="0.01" data-surface="rationalWeight" /></label>
+                </div>
                 <label class="range-field">
                   <span>층별 개화 지연 <output data-output="stagger">0.42</output></span>
                   <input type="range" min="0" max="0.65" step="0.01" data-path="stagger" />
@@ -111,14 +306,59 @@
               </div>
             </section>
 
+            <section class="control-section specimen-only" aria-labelledby="growth-title">
+              <button class="section-heading" id="growth-title" type="button" aria-expanded="false">
+                <span><i>04</i> GROWTH PROFILE</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
+              </button>
+              <div class="section-body" id="growth-controls">
+                <label class="range-field">
+                  <span>봉오리 머리 크기 <output data-growth-output="budHeadScale">72%</output></span>
+                  <input type="range" min="0.48" max="0.98" step="0.01" data-growth="budHeadScale" />
+                </label>
+                <div class="split-fields">
+                  <label class="range-field"><span>닫힌 꽃잎 길이 <output data-growth-output="closedPetalLength">66%</output></span><input type="range" min="0.42" max="1" step="0.01" data-growth="closedPetalLength" /></label>
+                  <label class="range-field"><span>닫힌 꽃잎 너비 <output data-growth-output="closedPetalWidth">49%</output></span><input type="range" min="0.34" max="1" step="0.01" data-growth="closedPetalWidth" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>기부 팽창 <output data-growth-output="basalEpinasty">94%</output></span><input type="range" min="0" max="1" step="0.01" data-growth="basalEpinasty" /></label>
+                  <label class="range-field"><span>가장자리 성장 <output data-growth-output="marginGrowth">10%</output></span><input type="range" min="0" max="1" step="0.01" data-growth="marginGrowth" /></label>
+                </div>
+                <div class="split-fields">
+                  <label class="range-field"><span>개방 시작 <output data-growth-output="openingStart">17%</output></span><input type="range" min="0.02" max="0.72" step="0.01" data-growth="openingStart" /></label>
+                  <label class="range-field"><span>전개 기간 <output data-growth-output="openingSpan">76%</output></span><input type="range" min="0.18" max="0.9" step="0.01" data-growth="openingSpan" /></label>
+                </div>
+              </div>
+            </section>
+
             <section class="control-section" aria-labelledby="render-title">
               <button class="section-heading" id="render-title" type="button" aria-expanded="true">
-                <span><i>04</i> RENDER LAB</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
+                <span><i>05</i> RENDER LAB</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg>
               </button>
               <div class="section-body render-controls">
                 <div class="select-row">
                   <label>환경광<select id="environment"><option value="studio">Botanical studio</option><option value="dawn">Warm dawn</option><option value="moon">Moon glasshouse</option></select></label>
                   <label>품질<select id="quality"><option value="balanced">Balanced</option><option value="cinematic">Cinematic</option></select></label>
+                </div>
+                <div class="render-subgroup" aria-label="환경조명과 배경 이미지">
+                  <span class="render-subtitle">환경조명 · 파노라마</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>조명 강도 <output data-render-output="environmentIntensity">100%</output></span><input type="range" min="0" max="2" step="0.01" data-render-number="environmentIntensity" /></label>
+                    <label class="range-field"><span>배경 밝기 <output data-render-output="backgroundIntensity">76%</output></span><input type="range" min="0" max="2" step="0.01" data-render-number="backgroundIntensity" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>배경 흐림 <output data-render-output="backgroundBlur">16%</output></span><input type="range" min="0" max="1" step="0.01" data-render-number="backgroundBlur" /></label>
+                    <label class="range-field"><span>환경 회전 <output data-render-output="environmentRotation">0°</output></span><input type="range" min="-180" max="180" step="1" data-render-number="environmentRotation" /></label>
+                  </div>
+                  <div class="environment-actions">
+                    <button type="button" id="environment-upload">파노라마 불러오기</button>
+                    <button type="button" id="environment-clear" disabled>프리셋으로</button>
+                    <input class="is-hidden" id="environment-file" type="file" accept="image/jpeg,image/png,image/webp,.hdr" />
+                  </div>
+                  <small class="environment-file-status" id="environment-file-status" aria-live="polite">내장 절차 파노라마 · 2:1</small>
+                </div>
+                <div class="render-subgroup" aria-label="카메라와 렌즈">
+                  <span class="render-subtitle">카메라 · 렌즈</span>
+                  <label class="range-field"><span>카메라 화각 <output data-render-output="cameraFov">38°</output></span><input type="range" min="18" max="85" step="1" data-render-number="cameraFov" /></label>
                 </div>
                 <div class="toggle-grid">
                   <label class="effect-toggle" title="화면 공간 전역 조명"><input type="checkbox" data-render="ssgi" /><span><b>SSGI</b><small>간접광</small></span><i></i></label>
@@ -127,6 +367,28 @@
                   <label class="effect-toggle" title="화면 공간 접촉 그림자"><input type="checkbox" data-render="contactShadows" /><span><b>SSS</b><small>접촉 그림자</small></span><i></i></label>
                   <label class="effect-toggle" title="고휘도 블룸"><input type="checkbox" data-render="bloom" /><span><b>BLOOM</b><small>광 번짐</small></span><i></i></label>
                   <label class="effect-toggle" title="PCF 소프트 섀도"><input type="checkbox" data-render="softShadows" /><span><b>SOFT</b><small>그림자</small></span><i></i></label>
+                  <label class="effect-toggle" title="카메라 심도와 조리개 보케"><input type="checkbox" data-render="depthOfField" /><span><b>DOF</b><small>아웃포커스</small></span><i></i></label>
+                  <label class="effect-toggle" title="환경 이미지를 장면 배경으로 표시"><input type="checkbox" data-render="environmentBackground" /><span><b>PANO</b><small>배경 이미지</small></span><i></i></label>
+                </div>
+                <div class="render-subgroup lens-controls" aria-label="아웃포커스와 보케">
+                  <span class="render-subtitle">아웃포커스 · 보케</span>
+                  <div class="split-fields">
+                    <label class="range-field"><span>초점 거리 <output data-render-output="focusDistance">6.8m</output></span><input type="range" min="0.5" max="50" step="0.1" data-render-number="focusDistance" /></label>
+                    <label class="range-field"><span>초점 범위 <output data-render-output="focusRange">1.8m</output></span><input type="range" min="0.1" max="12" step="0.1" data-render-number="focusRange" /></label>
+                  </div>
+                  <button class="focus-target" id="focus-target" type="button">현재 피사체에 초점</button>
+                  <div class="select-row bokeh-select-row">
+                    <label>보케 모양<select id="bokeh-shape"><option value="circle">원형 조리개</option><option value="polygon">사용자 다각형</option><option value="star">별 조리개</option><option value="heart">하트 조리개</option></select></label>
+                    <label class="range-field"><span>조리개 날 <output data-render-output="bokehBlades">6매</output></span><input id="bokeh-blades" type="range" min="3" max="12" step="1" data-render-number="bokehBlades" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>보케 크기 <output data-render-output="bokehScale">2.2×</output></span><input type="range" min="0.4" max="6" step="0.05" data-render-number="bokehScale" /></label>
+                    <label class="range-field"><span>보케 회전 <output data-render-output="bokehRotation">0°</output></span><input id="bokeh-rotation" type="range" min="-180" max="180" step="1" data-render-number="bokehRotation" /></label>
+                  </div>
+                  <div class="split-fields">
+                    <label class="range-field"><span>보케 감마 <output data-render-output="bokehGamma">1.08×</output></span><input type="range" min="0.55" max="2.2" step="0.01" data-render-number="bokehGamma" /></label>
+                    <label class="range-field"><span>비초점 감마 <output data-render-output="defocusGamma">1×</output></span><input type="range" min="0.55" max="2.2" step="0.01" data-render-number="defocusGamma" /></label>
+                  </div>
                 </div>
                 <div class="sss-meter">
                   <span>꽃잎 투과 산란 · SSS</span><output id="sss-value">82%</output>
@@ -182,9 +444,9 @@
 
         <section class="compatibility-card glass-panel" id="compatibility-card" hidden>
           <span class="compat-icon">!</span>
-          <p class="panel-kicker">WEBGPU REQUIRED</p>
+          <p class="panel-kicker">GPU RENDERER REQUIRED</p>
           <h2>이 브라우저에서는 꽃을 렌더링할 수 없습니다</h2>
-          <p>최신 Chrome 또는 Edge에서 하드웨어 가속과 WebGPU를 활성화한 뒤 다시 열어 주세요.</p>
+          <p>최신 Chrome 또는 Edge에서 하드웨어 가속을 활성화한 뒤 다시 열어 주세요. WebGPU를 사용할 수 없으면 WebGL 2로 자동 전환합니다.</p>
           <button type="button" onclick="location.reload()">다시 확인</button>
         </section>
       </main>
@@ -192,14 +454,26 @@
       <dialog id="research-dialog" class="research-dialog">
         <div class="research-shell">
           <header>
-            <div><p class="panel-kicker"><span>05</span> BOTANICAL NOTES</p><h2 id="research-title">개화 구조 연구 노트</h2></div>
+            <div><p class="panel-kicker"><span>06</span> BOTANICAL NOTES</p><h2 id="research-title">개화 구조 연구 노트</h2></div>
             <button type="button" id="research-close" aria-label="연구 노트 닫기">×</button>
           </header>
           <div class="research-content">
             <div class="mechanism-card"><span>개화 메커니즘</span><p id="research-mechanism"></p></div>
             <div><h3>형태학적 구조</h3><ul id="research-structure"></ul></div>
-            <div><h3>참고한 1차 자료</h3><div id="research-sources" class="source-list"></div></div>
-            <p class="research-note">이 시뮬레이션은 관찰 가능한 형태 변화의 교육용 근사 모델입니다. 분자·세포 수준의 생장 전체를 물리적으로 계산하는 생물역학 해석기는 아닙니다.</p>
+            <div>
+              <h3>eFLOWER 형질 → 꽃 기관 그래프</h3>
+              <div id="research-traits" class="growth-grid"></div>
+              <ol id="research-organ-graph" class="organ-graph"></ol>
+            </div>
+            <div>
+              <h3>관찰 자료 → 정규화 성장 계수</h3>
+              <div id="research-growth" class="growth-grid"></div>
+              <ul id="research-evidence" class="evidence-list"></ul>
+              <p id="research-mapping" class="mapping-note"></p>
+            </div>
+            <div><h3>Helios · OpenAlea식 기관별 개화 스케줄</h3><div id="research-phenology" class="phenology-list"></div></div>
+            <div><h3>참고한 학술·형태 자료</h3><div id="research-sources" class="source-list"></div></div>
+            <p class="research-note">백분율은 논문의 원시 계측값 자체가 아니라, 관찰된 상대 변화와 메커니즘을 화면 크기에 맞게 정규화한 시뮬레이션 계수입니다. 이 앱은 분자·세포 수준의 생장 전체를 계산하는 생물역학 해석기가 아닙니다.</p>
           </div>
         </div>
       </dialog>
